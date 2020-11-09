@@ -9,5 +9,4 @@ edition = "2018"
 [dependencies]
 getopts = "0.2.21"
 png = "0.16"
-num-traits = "0.2"
 libraw-rs = { path = "../libraw-rs/libraw" }

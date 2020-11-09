@@ -1,5 +1,3 @@
-use crate::debayer::Color;
-
 pub enum CFA {
 	/*
 	R G R G
@@ -29,6 +27,62 @@ impl CFA {
 				}
 			}
 		}
+	}
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Color {
+	Red,
+	Green,
+	Blue
+}
+
+pub struct Metadata {
+	cfa: CFA,
+	pub width: u32,
+	pub height: u32
+}
+
+impl Metadata {
+	pub fn new(cfa: CFA, width: u32, height: u32) -> Self {
+		Self {
+			cfa,
+			width,
+			height
+		}
+	}
+
+	pub fn rgb_len(&self) -> usize {
+		self.width as usize * self.height as usize * 3
+	}
+
+	pub fn are_coords_valid(&self, x: u32, y: u32) -> bool {
+		if x < self.width && y < self.height {
+			true
+		} else {
+			false
+		}
+	}
+
+	pub fn color_at_xy(&self, x: u32, y: u32) -> Color {
+		self.cfa.color_at(x, y)
+	}
+
+	pub fn color_at(&self, i: u32) -> Color {
+		self.cfa.color_at(i % self.width, i / self.width)
+	}
+}
+
+pub struct ComponentImage {
+	pub rgb: Vec<u16>,
+	pub meta: Metadata
+}
+
+impl ComponentImage {
+	pub fn as_bytes(self) -> Vec<u8> {
+		self.rgb.into_iter().map(|x| -> u8 {
+			((x as f32/ 4096.0) * 256.0) as u8 //TODO: 4096 allow changing bitness
+		}).collect()
 	}
 }
 

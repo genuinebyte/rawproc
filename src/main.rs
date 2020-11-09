@@ -1,6 +1,10 @@
+mod colors;
+mod common;
 mod debayer;
 
-use debayer::{Debayer, CFA};
+use colors::Colors;
+use common::{CFA, ComponentImage, Metadata};
+use debayer::Debayer;
 use getopts::Options;
 use std::time::Instant;
 use std::fs::File;
@@ -51,13 +55,14 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 	let height = sizes.raw_height as u32;
 	println!("image is {}x{}", width, height);
 
-	let mut rgb = vec![0; width as usize * height as usize * 3];
+	let mut cimg = ComponentImage {
+		meta: Metadata::new(CFA::RGGB, width, height),
+		rgb: vec![0; width as usize * height as usize * 3]
+	};
 
 	println!();
 	color.debug();
 	println!();
-
-	// Poor mans color correction
 
 	// Poor mans gamma crrection
 	before = Instant::now();
@@ -69,19 +74,15 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 
 	// Split the sensor data into its components
 	before = Instant::now();
-	let mut debayer = Debayer::new(&sensor_data, &mut rgb, CFA::RGGB, width, height);
+	Debayer::rgb(&sensor_data, &mut cimg);
 	after = Instant::now();
 	println!("Spliting sensor data into components took {}s", get_time(before, after));
 
 	// Nearest neighdoor debayering
 	before = Instant::now();
-	unsafe { debayer.nearest_neighboor(); }
+	unsafe { Debayer::nearest_neighboor(&mut cimg); }
 	after = Instant::now();
 	println!("Nearet neighboor took {}s", get_time(before, after));
-
-	let rgb: Vec<u8> = rgb.into_iter().map(|x| -> u8 {
-		((x as f32/ 4096.0) * 256.0) as u8
-	}).collect();
 
 	let fout = File::create(format!("{}.png", fname)).expect("Failed to create output file");
 	let mut encoder = png::Encoder::new(fout, width, height);
@@ -90,7 +91,7 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 
 	before = Instant::now();
 	let mut writer = encoder.write_header().expect("Failed to write PNG header");
-	writer.write_image_data(&rgb).expect("Failed to write image data");
+	writer.write_image_data(&cimg.as_bytes()).expect("Failed to write image data");
 	after = Instant::now();
 	println!("Writing out PNG took {}s", get_time(before, after));
 
