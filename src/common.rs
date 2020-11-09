@@ -37,6 +37,18 @@ pub enum Color {
 	Blue
 }
 
+use std::fmt;
+
+impl fmt::Display for Color {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			Color::Red => write!(f, "red"),
+			Color::Green => write!(f, "green"),
+			Color::Blue => write!(f, "blue")
+		}
+	}
+}
+
 pub struct Metadata {
 	cfa: CFA,
 	pub width: u32,

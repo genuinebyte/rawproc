@@ -9,14 +9,23 @@ impl Colors {
 		}
 	}
 	
-	pub fn black(rimg: &mut RawImage, black: u32) {
-		let black: u16 = black.try_into().unwrap();
-		for light in rimg.raw.iter_mut() {
-			if *light < black {
-				*light = 0;
+	pub fn black(rimg: &mut RawImage, red: u16, green: u16, blue: u16) {
+		let clamp = |light: u16, color: u16| {
+			if light < color {
+				0
 			} else {
-				*light = *light - black;
+				light - color
 			}
+		};
+
+		let mut i = 0;
+		for light in rimg.raw.iter_mut() {
+			match rimg.meta.color_at(i) {
+				Color::Red => *light = clamp(*light, red),
+				Color::Green => *light = clamp(*light, green),
+				Color::Blue => *light = clamp(*light, blue)
+			}
+			i += 1;
 		}
 	}
 

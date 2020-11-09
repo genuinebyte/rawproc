@@ -66,9 +66,9 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 
 	// Black Point
 	before = Instant::now();
-	Colors::black(&mut rimg, color.black);
+	Colors::black(&mut rimg, color.black as u16, color.black as u16, color.black as u16);
 	after = Instant::now();
-	println!("Black point took {}s", get_time(before, after));
+	println!("Black levels took {}s", get_time(before, after));
 
 	// Poor mans white balance
 	before = Instant::now();
