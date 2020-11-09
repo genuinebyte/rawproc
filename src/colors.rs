@@ -3,9 +3,9 @@ use std::convert::TryInto;
 
 pub struct Colors {}
 impl Colors {
-	pub fn gamma(rimg: &mut RawImage) {
+	pub fn gamma(rimg: &mut RawImage, value: f32) {
 		for light in rimg.raw.iter_mut() {
-			*light = ((*light as f32/ 4096.0).powf(1.0/2.2) * 4096.0) as u16; //TODO: 4096 allow different bitness
+			*light = ((*light as f32/ 4096.0).powf(1.0/value) * 4096.0) as u16; //TODO: 4096 allow different bitness
 		}
 	}
 	

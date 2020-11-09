@@ -72,13 +72,13 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 
 	// Poor mans white balance
 	before = Instant::now();
-	Colors::white(&mut rimg, color.cam_mul[0], color.cam_mul[1], color.cam_mul[2]);
+	Colors::white(&mut rimg, color.cam_mul[0], color.cam_mul[1] / 4.0, color.cam_mul[2]);
 	after = Instant::now();
 	println!("White balance took {}s", get_time(before, after));
 
 	// Poor mans gamma crrection
 	before = Instant::now();
-	Colors::gamma(&mut rimg);
+	Colors::gamma(&mut rimg, 2.2);
 	after = Instant::now();
 	println!("Gamma correction took {}s", get_time(before, after));
 
@@ -90,7 +90,7 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 
 	// Nearest neighdoor debayering
 	before = Instant::now();
-	unsafe { Debayer::nearest_neighboor(&mut cimg); }
+	//unsafe { Debayer::nearest_neighboor(&mut cimg); }
 	after = Instant::now();
 	println!("Nearet neighboor took {}s", get_time(before, after));
 
