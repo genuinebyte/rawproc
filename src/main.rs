@@ -3,7 +3,7 @@ mod common;
 mod debayer;
 
 use colors::Colors;
-use common::{CFA, ComponentImage, Metadata};
+use common::{CFA, Metadata, RawImage};
 use debayer::Debayer;
 use getopts::Options;
 use std::time::Instant;
@@ -55,26 +55,30 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 	let height = sizes.raw_height as u32;
 	println!("image is {}x{}", width, height);
 
-	let mut cimg = ComponentImage {
+	let mut rimg = RawImage {
 		meta: Metadata::new(CFA::RGGB, width, height),
-		rgb: vec![0; width as usize * height as usize * 3]
+		raw: sensor_data
 	};
 
 	println!();
 	color.debug();
 	println!();
 
+	// Poor mans white balance
+	before = Instant::now();
+	Colors::white(&mut rimg, color.cam_mul[0], color.cam_mul[1], color.cam_mul[2]);
+	after = Instant::now();
+	println!("White balance took {}s", get_time(before, after));
+
 	// Poor mans gamma crrection
 	before = Instant::now();
-	sensor_data = sensor_data.into_iter().map(|x| {
-		((x as f32/ 4096.0).powf(1.0/2.2) * 4096.0) as u16
-	}).collect();
+	Colors::gamma(&mut rimg);
 	after = Instant::now();
 	println!("Gamma correction took {}s", get_time(before, after));
 
 	// Split the sensor data into its components
 	before = Instant::now();
-	Debayer::rgb(&sensor_data, &mut cimg);
+	let mut cimg = Debayer::rgb(rimg);
 	after = Instant::now();
 	println!("Spliting sensor data into components took {}s", get_time(before, after));
 
@@ -89,6 +93,7 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 	encoder.set_color(png::ColorType::RGB);
 	encoder.set_depth(png::BitDepth::Eight);
 
+	println!("Writing out fullres PNG image. This might take awhile...");
 	before = Instant::now();
 	let mut writer = encoder.write_header().expect("Failed to write PNG header");
 	writer.write_image_data(&cimg.as_bytes()).expect("Failed to write image data");

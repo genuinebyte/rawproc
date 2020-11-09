@@ -1,36 +1,37 @@
-use crate::common::{Color, ComponentImage};
+use crate::common::{Color, ComponentImage, RawImage};
 
 pub struct Debayer {}
 impl Debayer {
-	pub fn rgb(raw: &[u16], cimg: &mut ComponentImage) {
-		let capacity = cimg.meta.rgb_len();
-		
-		if cimg.rgb.len() != capacity {
-			panic!("Expected buffer of size {} but got {}", capacity, cimg.rgb.len());
-		}
+	pub fn rgb(rimg: RawImage) -> ComponentImage {
+		let capacity = rimg.meta.rgb_len();
+		let mut rgb = vec![0; capacity];
 
 		let mut i: usize = 0;
-		for light in raw {
-			let light = *light;
-			match cimg.meta.color_at(i as u32) {
+		for light in rimg.raw {
+			match rimg.meta.color_at(i as u32) {
 				Color::Red => {
-					cimg.rgb[i*3] = light;
-					cimg.rgb[i*3 + 1] = 0;
-					cimg.rgb[i*3 + 2] = 0;
+					rgb[i*3] = light;
+					rgb[i*3 + 1] = 0;
+					rgb[i*3 + 2] = 0;
 				},
 				Color::Green => {
-					cimg.rgb[i*3] = 0;
-					cimg.rgb[i*3 + 1] = light;
-					cimg.rgb[i*3 + 2] = 0;
+					rgb[i*3] = 0;
+					rgb[i*3 + 1] = light;
+					rgb[i*3 + 2] = 0;
 				},
 				Color::Blue => {
-					cimg.rgb[i*3] = 0;
-					cimg.rgb[i*3 + 1] = 0;
-					cimg.rgb[i*3 + 2] = light;
+					rgb[i*3] = 0;
+					rgb[i*3 + 1] = 0;
+					rgb[i*3 + 2] = light;
 				}
 			}
 
 			i += 1;
+		}
+
+		ComponentImage {
+			meta: rimg.meta,
+			rgb
 		}
 	}
 

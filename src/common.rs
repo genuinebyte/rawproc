@@ -73,6 +73,11 @@ impl Metadata {
 	}
 }
 
+pub struct RawImage {
+	pub raw: Vec<u16>,
+	pub meta: Metadata
+}
+
 pub struct ComponentImage {
 	pub rgb: Vec<u16>,
 	pub meta: Metadata
