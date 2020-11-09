@@ -2,9 +2,6 @@ mod debayer;
 
 use debayer::{Debayer, CFA};
 use getopts::Options;
-use image::ColorType;
-use image::png::PngEncoder;
-use rawloader::{self, RawImageData};
 use std::time::Instant;
 use std::fs::File;
 
@@ -32,55 +29,70 @@ fn main() {
 }
 
 fn get_rgb(fname: &str) -> Vec<u8> {
+	
+	// Raw NEF data
+	let nef_data = std::fs::read(fname).expect("Read in");
+	let decoder = libraw::Processor::new();
+
+	// Decode into raw sensor data
 	let mut before = Instant::now();
-	let image = rawloader::decode_file(fname).expect("Failed to decode file!");
+	let decoded = decoder.decode(&nef_data).expect("Failed to decode NEF");
 	let mut after = Instant::now();
 	let get_time = |b: Instant, a: Instant| a.duration_since(b).as_millis() as f32 / 1000f32;
+	println!("NEF decode took {}s", get_time(before, after));
 
-	println!("Decoded {} raw in {}s\nImage is {}x{}", fname, get_time(before, after), image.width, image.height);
+	let mut sensor_data = (*decoded).to_vec();
+	println!("Sensor data is {} u16s long", sensor_data.len());
 
-	let sensor_data = match image.data {
-		RawImageData::Integer(vec) => vec,
-		_ => panic!("Dan't understand float image data!")
-	};
+	let sizes = decoded.sizes();
+	let color = decoded.color();
 
+	let width = sizes.raw_width as u32;
+	let height = sizes.raw_height as u32;
+	println!("image is {}x{}", width, height);
+
+	let mut rgb = vec![0; width as usize * height as usize * 3];
+
+	println!();
+	color.debug();
+	println!();
+
+	// Poor mans color correction
+
+	// Poor mans gamma crrection
 	before = Instant::now();
-	let mut debayer = Debayer::new(sensor_data, CFA::RGGB, image.width, image.height);
+	sensor_data = sensor_data.into_iter().map(|x| {
+		((x as f32/ 4096.0).powf(1.0/2.2) * 4096.0) as u16
+	}).collect();
 	after = Instant::now();
+	println!("Gamma correction took {}s", get_time(before, after));
 
+	// Split the sensor data into its components
+	before = Instant::now();
+	let mut debayer = Debayer::new(&sensor_data, &mut rgb, CFA::RGGB, width, height);
+	after = Instant::now();
 	println!("Spliting sensor data into components took {}s", get_time(before, after));
 
+	// Nearest neighdoor debayering
 	before = Instant::now();
-	debayer.nearest_neighboor();
+	unsafe { debayer.nearest_neighboor(); }
 	after = Instant::now();
-
 	println!("Nearet neighboor took {}s", get_time(before, after));
 
-	/*before = Instant::now();
+	let rgb: Vec<u8> = rgb.into_iter().map(|x| -> u8 {
+		((x as f32/ 4096.0) * 256.0) as u8
+	}).collect();
 
-	let fred = File::create(format!("{}.red.png", fname)).unwrap();
-	unsafe {
-		let red_data = std::slice::from_raw_parts(debayer.get_red().as_ptr() as *const u8, image.width * image.height * 2);
-		PngEncoder::new(fred).encode(red_data, image.width as u32, image.height as u32, ColorType::L16).expect("Failed to encode red png");
-	}
-
-	after = Instant::now();
-
-	println!("Took {}s to create the red PNG", get_time(before, after));*/
+	let fout = File::create(format!("{}.png", fname)).expect("Failed to create output file");
+	let mut encoder = png::Encoder::new(fout, width, height);
+	encoder.set_color(png::ColorType::RGB);
+	encoder.set_depth(png::BitDepth::Eight);
 
 	before = Instant::now();
-
-	let fred = File::create(format!("{}.green.png", fname)).unwrap();
-	unsafe {
-		let fullcolor = debayer.get_green();
-		println!("After fullcolor");
-		let green_data = std::slice::from_raw_parts(fullcolor.as_ptr() as *const u8, image.width * image.height * 2);
-		PngEncoder::new(fred).encode(green_data, image.width as u32, image.height as u32, ColorType::L16).expect("Failed to encode full-color png");
-	}
-
+	let mut writer = encoder.write_header().expect("Failed to write PNG header");
+	writer.write_image_data(&rgb).expect("Failed to write image data");
 	after = Instant::now();
-
-	println!("Took {}s to create the full-color PNG", get_time(before, after));
+	println!("Writing out PNG took {}s", get_time(before, after));
 
 	vec![]
 }

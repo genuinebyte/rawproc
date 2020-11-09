@@ -11,7 +11,7 @@ pub enum CFA {
 }
 
 impl CFA {
-	pub fn color_at(&self, x: usize, y: usize) -> Color {
+	pub fn color_at(&self, x: u32, y: u32) -> Color {
 		match self {
 			CFA::RGGB => {
 				if x%2 == 0 {
