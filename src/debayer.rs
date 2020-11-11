@@ -77,7 +77,9 @@ impl Debayer {
 		}
 	}
 
-	//FIXME: This isn't proper nearest neighboor at all, but uh, it's good enough for now?
+	/// A really bad implementation of the nearest neighbor interpolation
+	/// algorithm. Probably don't use it. It creates a top-down banding and
+	/// seems to mangle colors a bit in the dark spots.
 	pub unsafe fn nearest_neighboor(cimg: &mut ComponentImage) {
 		let mut red = *cimg.rgb.get_unchecked(0);
 		let mut green = *cimg.rgb.get_unchecked(1);

@@ -45,7 +45,7 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 	let get_time = |b: Instant, a: Instant| a.duration_since(b).as_millis() as f32 / 1000f32;
 	println!("NEF decode took {}s", get_time(before, after));
 
-	let mut sensor_data = (*decoded).to_vec();
+	let sensor_data = (*decoded).to_vec();
 	println!("Sensor data is {} u16s long", sensor_data.len());
 
 	let sizes = decoded.sizes();

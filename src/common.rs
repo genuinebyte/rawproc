@@ -68,6 +68,10 @@ impl Metadata {
 		self.width as usize * self.height as usize * 3
 	}
 
+	pub fn xytoi(&self, x: u32, y: u32) -> usize {
+		(y * self.width + x) as usize
+	}
+
 	pub fn are_coords_valid(&self, x: u32, y: u32) -> bool {
 		if x < self.width && y < self.height {
 			true

@@ -1,5 +1,4 @@
 use crate::common::{Color, RawImage};
-use std::convert::TryInto;
 
 pub struct Colors {}
 impl Colors {
