@@ -4,7 +4,7 @@ mod debayer;
 
 use colors::Colors;
 use common::{CFA, Metadata, RawImage};
-use debayer::Debayer;
+use debayer::{Debayer, Interpolate, NearestNeighbor};
 use getopts::Options;
 use std::time::Instant;
 use std::fs::File;
@@ -72,7 +72,7 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 
 	// Poor mans white balance
 	before = Instant::now();
-	Colors::white(&mut rimg, color.cam_mul[0], color.cam_mul[1] / 4.0, color.cam_mul[2]);
+	Colors::white(&mut rimg, color.cam_mul[0], color.cam_mul[1], color.cam_mul[2]);
 	after = Instant::now();
 	println!("White balance took {}s", get_time(before, after));
 
@@ -90,7 +90,7 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 
 	// Nearest neighdoor debayering
 	before = Instant::now();
-	//unsafe { Debayer::nearest_neighboor(&mut cimg); }
+	NearestNeighbor::interpolate(&mut cimg);
 	after = Instant::now();
 	println!("Nearet neighboor took {}s", get_time(before, after));
 

@@ -49,6 +49,22 @@ impl fmt::Display for Color {
 	}
 }
 
+impl From<Color> for usize {
+	fn from(c: Color) -> usize{
+		match c {
+			Color::Red => {
+				0
+			},
+			Color::Green => {
+				1
+			},
+			Color::Blue => {
+				2
+			}
+		}
+	}
+}
+
 pub struct Metadata {
 	cfa: CFA,
 	pub width: u32,
@@ -72,6 +88,13 @@ impl Metadata {
 		(y * self.width + x) as usize
 	}
 
+	pub fn itoxy(&self, i: usize) -> (u32, u32) {
+		let y = i / self.width as usize;
+		let x = i % self.width as usize;
+
+		(x as u32, y as u32)
+	}
+
 	pub fn are_coords_valid(&self, x: u32, y: u32) -> bool {
 		if x < self.width && y < self.height {
 			true
@@ -84,8 +107,8 @@ impl Metadata {
 		self.cfa.color_at(x, y)
 	}
 
-	pub fn color_at(&self, i: u32) -> Color {
-		self.cfa.color_at(i % self.width, i / self.width)
+	pub fn color_at(&self, i: usize) -> Color {
+		self.cfa.color_at((i % self.width as usize) as u32, (i / self.width as usize) as u32)
 	}
 }
 
@@ -104,6 +127,14 @@ impl ComponentImage {
 		self.rgb.into_iter().map(|x| -> u8 {
 			((x as f32/ 4096.0) * 256.0) as u8 //TODO: 4096 allow changing bitness
 		}).collect()
+	}
+
+	pub fn component(&self, x: u32, y: u32, color: Color) -> u16 {
+		self.rgb[self.meta.xytoi(x, y) + color as usize]
+	}
+
+	pub fn set_component(&mut self, i: usize, color: Color, data: u16) {
+		self.rgb[i + color as usize] = data;
 	}
 }
 

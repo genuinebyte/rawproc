@@ -1,4 +1,5 @@
 use crate::common::{Color, ComponentImage, RawImage};
+use rand;
 
 pub struct Debayer {}
 impl Debayer {
@@ -8,7 +9,7 @@ impl Debayer {
 
 		let mut i: usize = 0;
 		for light in rimg.raw {
-			match rimg.meta.color_at(i as u32) {
+			match rimg.meta.color_at(i) {
 				Color::Red => {
 					rgb[i*3] = light;
 					rgb[i*3 + 1] = 0;
@@ -76,33 +77,125 @@ impl Debayer {
 			}
 		}
 	}
+}
 
-	/// A really bad implementation of the nearest neighbor interpolation
-	/// algorithm. Probably don't use it. It creates a top-down banding and
-	/// seems to mangle colors a bit in the dark spots.
-	pub unsafe fn nearest_neighboor(cimg: &mut ComponentImage) {
-		let mut red = *cimg.rgb.get_unchecked(0);
-		let mut green = *cimg.rgb.get_unchecked(1);
-		let mut blue = *cimg.rgb.get_unchecked(2);
+pub trait Interpolate {
+	fn interpolate(cimg: &mut ComponentImage);
+}
 
-		for x in 0..cimg.meta.width {
-			for y in 0..cimg.meta.height {
-				match cimg.meta.color_at_xy(x, y) {
-					Color::Red => {
-						red = Self::get_pixel(cimg, Color::Red, x, y);
-						Self::set_pixel(cimg, Color::Green, green, x, y);
-						Self::set_pixel(cimg, Color::Blue, blue, x, y);
+// Currently assumes RGGB bayering
+pub struct NearestNeighbor {}
+
+impl Interpolate for NearestNeighbor {
+	fn interpolate(cimg: &mut ComponentImage) {
+		let pixel_count = (cimg.meta.width * cimg.meta.height) as usize;
+		for pix in 0..pixel_count {
+			match cimg.meta.color_at(pix) {
+				Color::Red => {
+					cimg.set_component(pix, Color::Green, Self::get_component(cimg, Color::Green, pix));
+					cimg.set_component(pix, Color::Blue, Self::get_component(cimg, Color::Blue, pix));
+				},
+				Color::Green => {
+					cimg.set_component(pix, Color::Red, Self::get_component(cimg, Color::Red, pix));
+					cimg.set_component(pix, Color::Blue, Self::get_component(cimg, Color::Blue, pix));
+				},
+				Color::Blue => {
+					cimg.set_component(pix, Color::Red, Self::get_component(cimg, Color::Red, pix));
+					cimg.set_component(pix, Color::Green, Self::get_component(cimg, Color::Green, pix));
+				}
+			}
+		}
+	}
+}
+
+impl NearestNeighbor {
+	fn get_component(cimg: &ComponentImage, color: Color, i: usize) -> u16 {
+		let (x, y) = cimg.meta.itoxy(i);
+
+		let top_color = if y == 0 {
+			// There is no top pixel
+			false
+		} else if y == cimg.meta.height-1 {
+			// There is no bottom pixel
+			true
+		} else {
+			// Use a random top/bottom
+			rand::random()
+		};
+
+		let left_color = if x == 0 {
+			// There is no left color
+			false
+		} else if x == cimg.meta.width-1 {
+			// There is no right color
+			true
+		} else {
+			// Use a random left/right
+			rand::random()
+		};
+
+		let color_x = if left_color {
+			x - 1
+		} else {
+			x + 1
+		};
+
+		let color_y = if top_color {
+			y - 1
+		} else {
+			y + 1
+		};
+
+		let current_color = cimg.meta.color_at_xy(x, y);
+
+		match current_color {
+			Color::Red => match color {
+				Color::Red => {
+					cimg.component(x, y, current_color)
+				},
+				Color::Green => {
+					if rand::random() {
+						cimg.component(x, color_y, color)
+					} else {
+						cimg.component(color_x, y, color)
+					}
+				},
+				Color::Blue => {
+					cimg.component(color_x, color_y, color)
+				}
+			},
+			Color::Green => {
+				let x_even = x%2 == 0;
+
+				match color {
+					Color::Red => if x_even {
+						cimg.component(x, color_y, color)
+					} else {
+						cimg.component(color_x, y, color)
 					},
 					Color::Green => {
-						Self::set_pixel(cimg, Color::Red, red, x, y);
-						green = Self::get_pixel(cimg, Color::Green, x, y);
-						Self::set_pixel(cimg, Color::Blue, blue, x, y);
+						cimg.component(x, y, current_color)
 					},
-					Color::Blue => {
-						Self::set_pixel(cimg, Color::Red, red, x, y);
-						Self::set_pixel(cimg, Color::Green, green, x, y);
-						blue = Self::get_pixel(cimg, Color::Blue, x, y);
-					},
+					Color::Blue => if x_even {
+						cimg.component(color_x, y, color)
+					} else {
+						cimg.component(x, color_y, color)
+					}
+				}
+			},
+			Color::Blue => match color {
+				Color::Red => {
+					cimg.component(color_x, color_y, color)
+				},
+				Color::Green => {
+					if rand::random() {
+						cimg.component(x, color_y, color)
+					} else {
+						cimg.component(color_x, y, color)
+					}
+				},
+				Color::Blue => {
+					cimg.component(x, y, current_color)
 				}
 			}
 		}
