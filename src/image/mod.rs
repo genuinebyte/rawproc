@@ -1,69 +1,8 @@
-pub enum CFA {
-	/*
-	R G R G
-	G B G B
-	R G R G
-	G B G B
-	*/
-	RGGB
-}
+mod cfa;
 
-impl CFA {
-	pub fn color_at(&self, x: u32, y: u32) -> Color {
-		match self {
-			CFA::RGGB => {
-				if x%2 == 0 {
-					if y%2 == 0 {
-						return Color::Red;
-					} else {
-						return Color::Green;
-					}
-				} else {
-					if y%2 == 0 {
-						return Color::Green;
-					} else {
-						return Color::Blue;
-					}
-				}
-			}
-		}
-	}
-}
+pub use cfa::CFA;
 
-#[derive(Debug, PartialEq)]
-pub enum Color {
-	Red,
-	Green,
-	Blue
-}
-
-use std::fmt;
-
-impl fmt::Display for Color {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match self {
-			Color::Red => write!(f, "red"),
-			Color::Green => write!(f, "green"),
-			Color::Blue => write!(f, "blue")
-		}
-	}
-}
-
-impl From<Color> for usize {
-	fn from(c: Color) -> usize{
-		match c {
-			Color::Red => {
-				0
-			},
-			Color::Green => {
-				1
-			},
-			Color::Blue => {
-				2
-			}
-		}
-	}
-}
+use crate::Color;
 
 pub struct Metadata {
 	cfa: CFA,
@@ -159,25 +98,5 @@ impl ComponentImage<f32> {
 		self.rgb.into_iter().map(|x| -> u8 {
 			(x * 256.0) as u8 //TODO: 4096 allow changing bitness
 		}).collect()
-	}
-}
-
-#[cfg(test)]
-mod cfa_tets {
-	use super::*;
-
-	#[test]
-	fn color_at_rggb() {
-		// Testing initial pattern
-		assert_eq!(CFA::RGGB.color_at(0, 0), Color::Red);
-		assert_eq!(CFA::RGGB.color_at(1, 0), Color::Green);
-		assert_eq!(CFA::RGGB.color_at(0, 1), Color::Green);
-		assert_eq!(CFA::RGGB.color_at(1, 1), Color::Blue);
-
-		// Testing expanded pattern
-		assert_eq!(CFA::RGGB.color_at(2, 2), Color::Red);
-		assert_eq!(CFA::RGGB.color_at(3, 2), Color::Green);
-		assert_eq!(CFA::RGGB.color_at(2, 3), Color::Green);
-		assert_eq!(CFA::RGGB.color_at(3, 3), Color::Blue);
 	}
 }

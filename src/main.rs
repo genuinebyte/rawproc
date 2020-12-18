@@ -1,9 +1,12 @@
+mod color;
 mod colors;
-mod common;
 mod debayer;
+mod image;
 
+pub use color::Color;
+
+use image::{CFA, Metadata, RawImage};
 use colors::Colors;
-use common::{CFA, Metadata, RawImage};
 use debayer::{Debayer, Interpolate, NearestNeighbor};
 use getopts::Options;
 use std::time::Instant;
@@ -22,7 +25,7 @@ fn main() {
 	opts.reqopt("f", "file", "File to work with", "FILE");
 	let matches = match opts.parse(&args[1..]) {
 		Ok(m) => m,
-		Err(f) => {
+		Err(_) => {
 			print_usage(program, opts);
 			return;
 		}
@@ -78,12 +81,6 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 	after = Instant::now();
 	println!("White balance took {}s", get_time(before, after));
 
-	// Poor mans gamma crrection
-	/*before = Instant::now();
-	Colors::gamma(&mut rimg, 2.2);
-	after = Instant::now();
-	println!("Gamma correction took {}s", get_time(before, after));*/
-
 	// Split the sensor data into its components
 	before = Instant::now();
 	let mut cimg = Debayer::rgb(rimg);
@@ -97,18 +94,6 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 	println!("Nearet neighboor took {}s", get_time(before, after));
 
 	let mut cimg = cimg.as_floats();
-
-	// cam to XYZ
-	/*before = Instant::now();
-	Colors::to_xyz(&mut cimg, &color);
-	after = Instant::now();
-	println!("cam to XYZ {}s", get_time(before, after));
-
-	// XYZ to sRGB
-	before = Instant::now();
-	Colors::xyz_to_linear_sRGB(&mut cimg);
-	after = Instant::now();
-	println!("XYZ to linear sRGB {}s", get_time(before, after));*/
 
 	// cam to sRGB
 	before = Instant::now();

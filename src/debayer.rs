@@ -1,4 +1,5 @@
-use crate::common::{Color, ComponentImage, RawImage};
+use crate::image::{ComponentImage, RawImage};
+use crate::Color;
 use rand;
 
 pub struct Debayer {}
