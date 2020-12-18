@@ -1,4 +1,4 @@
-use crate::image::{ComponentImage, RawImage};
+use crate::image::{RgbImage, RawImage};
 use crate::Color;
 use libraw::ColorData;
 
@@ -11,7 +11,7 @@ impl Colors {
 	}
 
 	#[allow(non_snake_case)]
-	pub fn sRGB_gamma(cimg: &mut ComponentImage<f32>) {
+	pub fn sRGB_gamma(cimg: &mut RgbImage<f32>) {
 		for component in cimg.rgb.iter_mut() {
 			// Value taken from Wikipedia page on sRGB
 			// https://en.wikipedia.org/wiki/SRGB
@@ -22,7 +22,7 @@ impl Colors {
 			}
 		}
 	}
-	
+
 	pub fn black(rimg: &mut RawImage, red: u16, green: u16, blue: u16) {
 		let clamp = |light: u16, color: u16| {
 			if light < color {
@@ -56,7 +56,7 @@ impl Colors {
 	}
 
 	//FIXME: Is this what's wrong with the xyz -> sRGB chain? Maybe because we whitebalance?
-	pub fn to_xyz(cimg: &mut ComponentImage<f32>, colordata: &ColorData) {
+	pub fn to_xyz(cimg: &mut RgbImage<f32>, colordata: &ColorData) {
 		let mat = colordata.cam_xyz;
 		for pix in cimg.pixel_range() {
 			let (r, g, b) = (cimg.rgb[pix], cimg.rgb[pix+1], cimg.rgb[pix+2]);
@@ -68,7 +68,7 @@ impl Colors {
 	}
 
 	#[allow(non_snake_case)]
-	pub fn to_sRGB(cimg: &mut ComponentImage<f32>, colordata: &ColorData) {
+	pub fn to_sRGB(cimg: &mut RgbImage<f32>, colordata: &ColorData) {
 		let mat = colordata.rgb_cam;
 		for pix in cimg.pixel_range() {
 			let (r, g, b) = (cimg.rgb[pix], cimg.rgb[pix+1], cimg.rgb[pix+2]);
@@ -83,7 +83,7 @@ impl Colors {
 	// http://color.org/chardata/rgb/sRGB.pdf
 	//FIXME: This doesn't work with the matrix got from to_xyz
 	#[allow(non_snake_case)]
-	pub fn xyz_to_linear_sRGB(cimg: &mut ComponentImage<f32>) {
+	pub fn xyz_to_linear_sRGB(cimg: &mut RgbImage<f32>) {
 		// f32::clamp is in nightly, so we use this for now
 		let clamp = |component: f32| -> f32 {
 			if component < 0.0 {

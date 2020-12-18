@@ -1,10 +1,10 @@
-use crate::image::{ComponentImage, RawImage};
+use crate::image::{RgbImage, RawImage};
 use crate::Color;
 use rand;
 
 pub struct Debayer {}
 impl Debayer {
-	pub fn rgb(rimg: RawImage) -> ComponentImage<u16> {
+	pub fn rgb(rimg: RawImage) -> RgbImage<u16> {
 		let capacity = rimg.meta.rgb_len();
 		let mut rgb = vec![0; capacity];
 
@@ -31,7 +31,7 @@ impl Debayer {
 			i += 1;
 		}
 
-		ComponentImage {
+		RgbImage {
 			meta: rimg.meta,
 			rgb
 		}
@@ -39,14 +39,14 @@ impl Debayer {
 }
 
 pub trait Interpolate<T: Copy> {
-	fn interpolate(cimg: &mut ComponentImage<T>);
+	fn interpolate(cimg: &mut RgbImage<T>);
 }
 
 // Currently assumes RGGB bayering
 pub struct NearestNeighbor {}
 
 impl<T: Copy> Interpolate<T> for NearestNeighbor {
-	fn interpolate(cimg: &mut ComponentImage<T>) {
+	fn interpolate(cimg: &mut RgbImage<T>) {
 		let pixel_count = (cimg.meta.width * cimg.meta.height) as usize;
 		for pix in 0..pixel_count {
 			match cimg.meta.color_at(pix) {
@@ -68,7 +68,7 @@ impl<T: Copy> Interpolate<T> for NearestNeighbor {
 }
 
 impl NearestNeighbor {
-	fn get_component<T: Copy>(cimg: &ComponentImage<T>, color: Color, i: usize) -> T {
+	fn get_component<T: Copy>(cimg: &RgbImage<T>, color: Color, i: usize) -> T {
 		let (x, y) = cimg.meta.itoxy(i);
 
 		let top_color = if y == 0 {
