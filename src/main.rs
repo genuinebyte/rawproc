@@ -38,6 +38,8 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 	let nef_data = std::fs::read(fname).expect("Read in");
 	let decoder = libraw::Processor::new();
 
+	let the_start_of_it_all = Instant::now();
+
 	// Decode into raw sensor data
 	let mut before = Instant::now();
 	let decoded = decoder.decode(&nef_data).expect("Failed to decode NEF");
@@ -77,10 +79,10 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 	println!("White balance took {}s", get_time(before, after));
 
 	// Poor mans gamma crrection
-	before = Instant::now();
+	/*before = Instant::now();
 	Colors::gamma(&mut rimg, 2.2);
 	after = Instant::now();
-	println!("Gamma correction took {}s", get_time(before, after));
+	println!("Gamma correction took {}s", get_time(before, after));*/
 
 	// Split the sensor data into its components
 	before = Instant::now();
@@ -94,6 +96,32 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 	after = Instant::now();
 	println!("Nearet neighboor took {}s", get_time(before, after));
 
+	let mut cimg = cimg.as_floats();
+
+	// cam to XYZ
+	/*before = Instant::now();
+	Colors::to_xyz(&mut cimg, &color);
+	after = Instant::now();
+	println!("cam to XYZ {}s", get_time(before, after));
+
+	// XYZ to sRGB
+	before = Instant::now();
+	Colors::xyz_to_linear_sRGB(&mut cimg);
+	after = Instant::now();
+	println!("XYZ to linear sRGB {}s", get_time(before, after));*/
+
+	// cam to sRGB
+	before = Instant::now();
+	Colors::to_sRGB(&mut cimg, &color);
+	after = Instant::now();
+	println!("cam to sRGB {}s", get_time(before, after));
+	
+	// sRGB gamma correction
+	before = Instant::now();
+	Colors::sRGB_gamma(&mut cimg);
+	after = Instant::now();
+	println!("sRGB gamma correction took {}s", get_time(before, after));
+
 	let fout = File::create(format!("{}.png", fname)).expect("Failed to create output file");
 	let mut encoder = png::Encoder::new(fout, width, height);
 	encoder.set_color(png::ColorType::RGB);
@@ -105,6 +133,10 @@ fn get_rgb(fname: &str) -> Vec<u8> {
 	writer.write_image_data(&cimg.as_bytes()).expect("Failed to write image data");
 	after = Instant::now();
 	println!("Writing out PNG took {}s", get_time(before, after));
+
+	let out_with_a_bang = Instant::now();
+	let the_age_of_everthing = get_time(the_start_of_it_all, out_with_a_bang) as u32;
+	println!("Processing took {}m{}s", the_age_of_everthing / 60, the_age_of_everthing % 60);
 
 	vec![]
 }

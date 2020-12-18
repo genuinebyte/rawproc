@@ -3,7 +3,7 @@ use rand;
 
 pub struct Debayer {}
 impl Debayer {
-	pub fn rgb(rimg: RawImage) -> ComponentImage {
+	pub fn rgb(rimg: RawImage) -> ComponentImage<u16> {
 		let capacity = rimg.meta.rgb_len();
 		let mut rgb = vec![0; capacity];
 
@@ -35,59 +35,17 @@ impl Debayer {
 			rgb
 		}
 	}
-
-	fn get_pixel(cimg: &ComponentImage, color: Color, x: u32, y: u32) -> u16 {
-		if !cimg.meta.are_coords_valid(x, y) {
-			panic!(format!("Tried to access a pixel out of the images bounds: {}, {}", x, y));
-		}
-
-		let index = ((y * cimg.meta.width + x) * 3) as usize;
-		unsafe {
-			match color {
-				Color::Red => {
-					*cimg.rgb.get_unchecked(index)
-				},
-				Color::Green => {
-					*cimg.rgb.get_unchecked(index+1)
-				},
-				Color::Blue => {
-					*cimg.rgb.get_unchecked(index+2)
-				}
-			}
-		}
-	}
-
-	fn set_pixel(cimg: &mut ComponentImage, color: Color, value: u16, x: u32, y: u32) {
-		if !cimg.meta.are_coords_valid(x, y) {
-			panic!(format!("Tried to set a pixel out of the images bounds: {}, {}", x, y));
-		}
-
-		let index = ((y * cimg.meta.width + x) * 3) as usize;
-		unsafe {
-			match color {
-				Color::Red => {
-					*cimg.rgb.get_unchecked_mut(index) = value;
-				},
-				Color::Green => {
-					*cimg.rgb.get_unchecked_mut(index+1) = value;
-				},
-				Color::Blue => {
-					*cimg.rgb.get_unchecked_mut(index+2) = value;
-				}
-			}
-		}
-	}
 }
 
-pub trait Interpolate {
-	fn interpolate(cimg: &mut ComponentImage);
+pub trait Interpolate<T: Copy> {
+	fn interpolate(cimg: &mut ComponentImage<T>);
 }
 
 // Currently assumes RGGB bayering
 pub struct NearestNeighbor {}
 
-impl Interpolate for NearestNeighbor {
-	fn interpolate(cimg: &mut ComponentImage) {
+impl<T: Copy> Interpolate<T> for NearestNeighbor {
+	fn interpolate(cimg: &mut ComponentImage<T>) {
 		let pixel_count = (cimg.meta.width * cimg.meta.height) as usize;
 		for pix in 0..pixel_count {
 			match cimg.meta.color_at(pix) {
@@ -109,7 +67,7 @@ impl Interpolate for NearestNeighbor {
 }
 
 impl NearestNeighbor {
-	fn get_component(cimg: &ComponentImage, color: Color, i: usize) -> u16 {
+	fn get_component<T: Copy>(cimg: &ComponentImage<T>, color: Color, i: usize) -> T {
 		let (x, y) = cimg.meta.itoxy(i);
 
 		let top_color = if y == 0 {
