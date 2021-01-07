@@ -4,13 +4,13 @@ use rand;
 
 pub struct Debayer {}
 impl Debayer {
-	pub fn rgb(rimg: RawImage) -> RgbImage<u16> {
-		let capacity = rimg.meta.rgb_len();
+	fn rgb(rimg: RawImage) -> RgbImage<u16> {
+		let capacity = rimg.meta.pixels() * 3;
 		let mut rgb = vec![0; capacity];
 
 		let mut i: usize = 0;
 		for light in rimg.raw {
-			match rimg.meta.color_at(i) {
+			match rimg.meta.color_at_index(i) {
 				Color::Red => {
 					rgb[i*3] = light;
 					rgb[i*3 + 1] = 0;
@@ -38,18 +38,18 @@ impl Debayer {
 	}
 }
 
-pub trait Interpolate<T: Copy> {
+trait Interpolate<T: Copy> {
 	fn interpolate(cimg: &mut RgbImage<T>);
 }
 
 // Currently assumes RGGB bayering
-pub struct NearestNeighbor {}
+struct NearestNeighbor {}
 
 impl<T: Copy> Interpolate<T> for NearestNeighbor {
 	fn interpolate(cimg: &mut RgbImage<T>) {
 		let pixel_count = (cimg.meta.width * cimg.meta.height) as usize;
 		for pix in 0..pixel_count {
-			match cimg.meta.color_at(pix) {
+			match cimg.meta.color_at_index(pix) {
 				Color::Red => {
 					cimg.set_component(pix, Color::Green, Self::get_component(cimg, Color::Green, pix));
 					cimg.set_component(pix, Color::Blue, Self::get_component(cimg, Color::Blue, pix));

@@ -1,11 +1,62 @@
 use crate::Color;
-use crate::Metadata;
 use std::ops::Range;
 use std::iter::StepBy;
+use crate::CFA;
+use libraw::ColorData;
+
+pub struct Metadata {
+	pub width: u32,
+	pub height: u32,
+	pub cfa: CFA,
+	pub colordata: ColorData
+}
+
+impl Metadata {
+	pub fn new(width: u32, height: u32, cfa: CFA, colordata: ColorData) -> Self {
+		Self {
+			width,
+			height,
+			cfa,
+			colordata
+		}
+	}
+
+	pub fn xytoi(&self, x: u32, y: u32) -> usize {
+		(y * self.width + x) as usize
+	}
+
+	pub fn itoxy(&self, i: usize) -> (u32, u32) {
+		let y = i / self.width as usize;
+		let x = i % self.width as usize;
+
+		(x as u32, y as u32)
+	}
+
+	pub fn pixels(&self) -> usize {
+		self.width as usize * self.height as usize
+	}
+
+	pub fn color_at_index(&self, index: usize) -> Color {
+		let (x, y) = self.itoxy(index);
+		self.cfa.color_at(x, y)
+	}
+
+	pub fn color_at_xy(&self,x: u32, y: u32) -> Color {
+		self.cfa.color_at(x, y)
+	}
+}
+
+pub struct RawImage {
+	pub(crate) raw: Vec<u16>,
+	pub(crate) meta: Metadata
+}
+
+impl RawImage {
+}
 
 pub struct RgbImage<T: Copy> {
-	pub rgb: Vec<T>,
-	pub meta: Metadata
+	pub(crate) rgb: Vec<T>,
+	pub(crate) meta: Metadata
 }
 
 impl<T: Copy> RgbImage<T> {

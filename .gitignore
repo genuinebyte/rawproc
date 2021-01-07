@@ -1,7 +1,8 @@
 /target
 
-# Output PNG files
+# Image files
 *.png
+*.jpg
 
 # Test NEF files and darktables XMP
 *.NEF
