@@ -48,7 +48,7 @@ impl Metadata {
 
 pub struct RawImage {
 	pub(crate) raw: Vec<u16>,
-	pub(crate) meta: Metadata
+	pub meta: Metadata
 }
 
 impl RawImage {
@@ -56,7 +56,7 @@ impl RawImage {
 
 pub struct RgbImage<T: Copy> {
 	pub(crate) rgb: Vec<T>,
-	pub(crate) meta: Metadata
+	pub meta: Metadata
 }
 
 impl<T: Copy> RgbImage<T> {
