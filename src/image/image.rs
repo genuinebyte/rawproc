@@ -47,7 +47,7 @@ impl Metadata {
 }
 
 pub struct RawImage {
-	pub(crate) raw: Vec<u16>,
+	pub raw: Vec<u16>,
 	pub meta: Metadata
 }
 
@@ -55,7 +55,7 @@ impl RawImage {
 }
 
 pub struct RgbImage<T: Copy> {
-	pub(crate) rgb: Vec<T>,
+	pub rgb: Vec<T>,
 	pub meta: Metadata
 }
 
@@ -78,7 +78,7 @@ impl<T: Copy> RgbImage<T> {
 }
 
 impl RgbImage<u16> {
-	pub fn as_floats(self) -> RgbImage<f32> {
+	pub fn as_float_image(self) -> RgbImage<f32> {
 		RgbImage {
 			rgb: self.rgb.into_iter().map(|x| -> f32 {
 					x as f32/ 4096.0 //TODO: 4096 allow changing bitness
@@ -89,6 +89,15 @@ impl RgbImage<u16> {
 }
 
 impl RgbImage<f32> {
+	pub fn as_byte_image(self) -> RgbImage<u8> {
+		RgbImage {
+			rgb: self.rgb.into_iter().map(|x| -> u8 {
+					(x * 256.0) as u8
+				}).collect(),
+			meta: self.meta
+		}
+	}
+
 	pub fn as_bytes(self) -> Vec<u8> {
 		self.rgb.into_iter().map(|x| -> u8 {
 			(x * 256.0) as u8

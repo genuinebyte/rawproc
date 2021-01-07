@@ -1,6 +1,6 @@
 use crate::image::{RgbImage, RawImage};
 use crate::Color;
-use libraw::ColorData;
+use std::cmp::min;
 
 pub struct Processor {}
 impl Processor {
@@ -49,9 +49,24 @@ impl Processor {
 		}
 	}
 
+	// https://math.stackexchange.com/a/906280
+	pub fn brightness(cimg: &mut RgbImage<u8>, value: u8) {
+		for comp in cimg.rgb.iter_mut() {
+			*comp = min((*comp as u16) + value as u16, 256u16) as u8;
+		}
+	}
+
+	// https://math.stackexchange.com/a/906280
+	pub fn contrast(cimg: &mut RgbImage<u8>, value: f32) {
+		for comp in cimg.rgb.iter_mut() {
+			let adjusted = 0f32.max(value * (*comp as f32 - 128.0) + 128.0);
+			*comp = min(adjusted as u16, 256u16) as u8;
+		}
+	}
+
 	#[allow(non_snake_case)]
-	pub fn to_sRGB(cimg: &mut RgbImage<f32>, colordata: &ColorData) {
-		let mat = colordata.rgb_cam;
+	pub fn to_sRGB(cimg: &mut RgbImage<f32>) {
+		let mat = cimg.meta.colordata.rgb_cam;
 		for pix in cimg.pixel_range() {
 			let (r, g, b) = (cimg.rgb[pix], cimg.rgb[pix+1], cimg.rgb[pix+2]);
 

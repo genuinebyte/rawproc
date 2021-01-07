@@ -1,6 +1,6 @@
 mod color;
 mod processor;
-mod debayer;
+pub mod debayer;
 pub mod image;
 
 pub use color::Color;

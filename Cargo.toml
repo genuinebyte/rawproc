@@ -5,6 +5,5 @@ authors = ["Brad Alfirevic <brad@genbyte.dev>"]
 edition = "2018"
 
 [dependencies]
-image = { version = "0.23.12", default-features = false, features = ["jpeg", "png"] }
 libraw-rs = { path = "../libraw-rs/libraw" }
 rand = "0.7"
