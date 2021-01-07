@@ -2,7 +2,7 @@ mod cfa;
 mod image;
 
 pub use cfa::CFA;
-pub use image::RgbImage;
+pub use self::image::RgbImage;
 
 use crate::Color;
 
@@ -34,14 +34,6 @@ impl Metadata {
 		let x = i % self.width as usize;
 
 		(x as u32, y as u32)
-	}
-
-	pub fn are_coords_valid(&self, x: u32, y: u32) -> bool {
-		if x < self.width && y < self.height {
-			true
-		} else {
-			false
-		}
 	}
 
 	pub fn color_at_xy(&self, x: u32, y: u32) -> Color {

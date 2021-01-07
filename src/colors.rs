@@ -4,6 +4,13 @@ use libraw::ColorData;
 
 pub struct Colors {}
 impl Colors {
+	// https://photo.stackexchange.com/a/41936
+	pub fn adjust_exposure(rimg: &mut RawImage, ev: f32) {
+		for light in rimg.raw.iter_mut() {
+			*light = ((*light as f32/ 4096.0) * 2f32.powf(ev) * 4096.0) as u16; //TODO: 4096 allow different bitness
+		}
+	}
+
 	pub fn gamma(rimg: &mut RawImage, value: f32) {
 		for light in rimg.raw.iter_mut() {
 			*light = ((*light as f32/ 4096.0).powf(1.0/value) * 4096.0) as u16; //TODO: 4096 allow different bitness
