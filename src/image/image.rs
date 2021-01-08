@@ -2,17 +2,17 @@ use crate::Color;
 use std::ops::Range;
 use std::iter::StepBy;
 use crate::CFA;
-use libraw::ColorData;
+use libraw::Colordata;
 
 pub struct Metadata {
 	pub width: u32,
 	pub height: u32,
 	pub cfa: CFA,
-	pub colordata: ColorData
+	pub colordata: Colordata
 }
 
 impl Metadata {
-	pub fn new(width: u32, height: u32, cfa: CFA, colordata: ColorData) -> Self {
+	pub fn new(width: u32, height: u32, cfa: CFA, colordata: Colordata) -> Self {
 		Self {
 			width,
 			height,
