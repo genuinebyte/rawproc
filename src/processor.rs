@@ -1,4 +1,4 @@
-use crate::image::{Image, Sensor, Rgb};
+use crate::image::{Image, Sensor, Rgb, Hsv};
 use crate::Color;
 use std::cmp::min;
 
@@ -89,40 +89,167 @@ impl Processor {
 		}
 	}
 
-	/*// XYZ to sRGB values taken from:
-	// http://color.org/chardata/rgb/sRGB.pdf
-	//FIXME: This doesn't work with the matrix got from to_xyz
-	#[allow(non_snake_case)]
-	pub fn xyz_to_linear_sRGB(cimg: &mut RgbImage<f32>) {
-		// f32::clamp is in nightly, so we use this for now
-		let clamp = |component: f32| -> f32 {
-			if component < 0.0 {
-				0.0
-			} else if component > 1.0{
-				1.0
-			} else {
-				component
-			}
-		};
+	// https://en.wikipedia.org/wiki/HSL_and_HSV#From_RGB
+	pub fn rgb_to_hsv(mut rgb: Image<Rgb, f32>) -> Image<Hsv, f32> {
+		for pix in rgb.pixel_index_range() {
+			let (h, s, v) = Processor::pixel_rgb_to_hsv(rgb.data[pix], rgb.data[pix+1], rgb.data[pix+2]);
 
-		for pix in cimg.pixel_range() {
-			let (x, y, z) = (cimg.rgb[pix], cimg.rgb[pix+1], cimg.rgb[pix+2]);
+			rgb.data[pix] = h;
+			rgb.data[pix+1] = s;
+			rgb.data[pix+2] = v;
+		}
 
-			cimg.rgb[pix] = clamp(3.2406255 * x + -1.537208 * y + -0.4986286 * z);   // R
-			cimg.rgb[pix+1] = clamp(-0.9689307 * x + 1.8757561 * y + 0.0415175 * z); // G
-			cimg.rgb[pix+2] = clamp(0.0557101 * x + -0.2040211 * y + 1.0569959 * z); // B
+		Image {
+			data: rgb.data,
+			kind: Hsv {},
+			meta: rgb.meta
 		}
 	}
 
-	//FIXME: Is this what's wrong with the xyz -> sRGB chain? Maybe because we whitebalance?
-	pub fn to_xyz(cimg: &mut RgbImage<f32>, colordata: &ColorData) {
-		let mat = colordata.cam_xyz;
-		for pix in cimg.pixel_range() {
-			let (r, g, b) = (cimg.rgb[pix], cimg.rgb[pix+1], cimg.rgb[pix+2]);
+	fn pixel_rgb_to_hsv(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+		let value = r.max(g.max(b));
+		let x_min = r.min(g.min(b));
+		let chroma = value - x_min;
 
-			cimg.rgb[pix] = mat[0][0] * r + mat[0][1] * g + mat[0][2] * b;   // X
-			cimg.rgb[pix+1] = mat[1][0] * r + mat[1][1] * g + mat[1][2] * b; // Y
-			cimg.rgb[pix+2] = mat[2][0] * r + mat[2][1] * g + mat[2][2] * b; // Z
+		let hue = if chroma == 0.0 {
+			0.0
+		} else if value == r {
+			60.0 * ((g - b) / chroma)
+		} else if value == g {
+			60.0 * (2.0 + (b - r) / chroma)
+		} else if value == b {
+			60.0 * (4.0 + (r - g) / chroma)
+		} else {
+			unreachable!()
+		};
+
+		let value_saturation = if value == 0.0 {				
+			0.0
+		} else {
+			chroma / value
+		};
+
+		(hue, value_saturation, value)
+	}
+
+	// https://en.wikipedia.org/wiki/HSL_and_HSV#HSV_to_RGB
+	pub fn hsv_to_rgb(mut hsv: Image<Hsv, f32>) -> Image<Rgb, f32> {
+		for pix in hsv.pixel_index_range() {
+			let (hue, saturation, value) = (hsv.data[pix], hsv.data[pix+1], hsv.data[pix+2]);
+
+			let chroma = value * saturation;
+			let hue_prime = hue / 60.0;
+			let x = chroma * (1.0 - (hue_prime%2.0 - 1.0).abs());
+
+			let m = value - chroma;
+			let cm = chroma + m;
+			let xm = x + m;
+
+			let (r, g, b) = if 0.0 <= hue_prime && hue_prime <= 1.0 {
+				(cm, xm, m)
+			} else if 1.0 < hue_prime && hue_prime <= 2.0 {
+				(xm, cm, m)
+			} else if 2.0 < hue_prime && hue_prime <= 3.0 {
+				(m, cm, xm)
+			} else if 3.0 < hue_prime && hue_prime <= 4.0 {
+				(m, xm, cm)
+			} else if 4.0 < hue_prime && hue_prime <= 5.0 {
+				(xm, m, cm)
+			} else if 5.0 < hue_prime && hue_prime <= 6.0 {
+				(cm, m, xm)
+			} else {
+				unreachable!()
+			};
+
+			hsv.data[pix] = r;
+			hsv.data[pix+1] = g;
+			hsv.data[pix+2] = b;
 		}
-	}*/
+
+		Image {
+			data: hsv.data,
+			kind: Rgb {},
+			meta: hsv.meta
+		}
+	}
+
+	fn pixel_hsv_to_rgb(hue: f32, saturation: f32, value: f32) -> (f32, f32, f32) {
+		let chroma = value * saturation;
+		let hue_prime = hue / 60.0;
+		let x = chroma * (1.0 - (hue_prime%2.0 - 1.0).abs());
+
+		let m = value - chroma;
+		let cm = chroma + m;
+		let xm = x + m;
+
+		if 0.0 <= hue_prime && hue_prime <= 1.0 {
+			(cm, xm, m)
+		} else if 1.0 < hue_prime && hue_prime <= 2.0 {
+			(xm, cm, m)
+		} else if 2.0 < hue_prime && hue_prime <= 3.0 {
+			(m, cm, xm)
+		} else if 3.0 < hue_prime && hue_prime <= 4.0 {
+			(m, xm, cm)
+		} else if 4.0 < hue_prime && hue_prime <= 5.0 {
+			(xm, m, cm)
+		} else if 5.0 < hue_prime && hue_prime <= 6.0 {
+			(cm, m, xm)
+		} else {
+			unreachable!()
+		}
+	}
+}
+
+#[cfg(test)]
+mod cfa_tets {
+	use super::*;
+
+	#[test]
+	fn rgb_to_hsv() {
+		// White. No saturation (no "colorfullness") and all value (all light emmitted, kind of)
+		let (_h, s, v) = Processor::pixel_rgb_to_hsv(1.0, 1.0, 1.0);
+		assert_eq!((s, v), (0.0, 1.0));
+
+		// Full Red. Hue at 0 degrees, all colorfullness and all lit
+		assert_eq!(
+			Processor::pixel_rgb_to_hsv(1.0, 0.0, 0.0),
+			(0.0, 1.0, 1.0)
+		);
+
+		// Full Green
+		assert_eq!(
+			Processor::pixel_rgb_to_hsv(0.0, 1.0, 0.0),
+			(120.0, 1.0, 1.0)
+		);
+
+		// Full Blue
+		assert_eq!(
+			Processor::pixel_rgb_to_hsv(0.0, 0.0, 1.0),
+			(240.0, 1.0, 1.0)
+		);
+	}
+
+	#[test]
+	fn hsv_to_rgb() {
+		// White. Every color maxed
+		assert_eq!(
+			Processor::pixel_hsv_to_rgb(0.0, 0.0, 1.0),
+			(1.0, 1.0, 1.0)
+		);
+
+		assert_eq!(
+			Processor::pixel_hsv_to_rgb(0.0, 1.0, 1.0),
+			(1.0, 0.0, 0.0)
+		);
+
+		assert_eq!(
+			Processor::pixel_hsv_to_rgb(120.0, 1.0, 1.0),
+			(0.0, 1.0, 0.0)
+		);
+
+		assert_eq!(
+			Processor::pixel_hsv_to_rgb(240.0, 1.0, 1.0),
+			(0.0, 0.0, 1.0)
+		);
+	}
 }

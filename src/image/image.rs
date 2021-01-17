@@ -4,6 +4,7 @@ use std::iter::StepBy;
 use crate::CFA;
 use libraw::Colordata;
 use num_traits::{Num, PrimInt, AsPrimitive};
+use crate::Processor;
 
 pub struct Metadata {
 	pub width: u32,
@@ -65,7 +66,14 @@ impl Kind for Sensor {
 }
 
 pub struct Rgb{}
-impl Kind for Rgb{
+impl Kind for Rgb {
+	fn per_pixel() -> usize {
+		3
+	}
+}
+
+pub struct Hsv{}
+impl Kind for Hsv {
 	fn per_pixel() -> usize {
 		3
 	}
@@ -128,30 +136,14 @@ impl<K: Kind> Image<K, f32> {
 	}
 }
 
-/*impl RgbImage<u16> {
-	pub fn as_float_image(self) -> RgbImage<f32> {
-		RgbImage {
-			rgb: self.rgb.into_iter().map(|x| -> f32 {
-					x as f32/ 4096.0 //TODO: 4096 allow changing bitness
-				}).collect(),
-			meta: self.meta
-		}
+impl From<Image<Rgb, f32>> for Image<Hsv, f32> {
+	fn from(rgb: Image<Rgb, f32>) -> Image<Hsv, f32> {
+		Processor::rgb_to_hsv(rgb)
 	}
 }
 
-impl RgbImage<f32> {
-	pub fn as_byte_image(self) -> RgbImage<u8> {
-		RgbImage {
-			rgb: self.rgb.into_iter().map(|x| -> u8 {
-					(x * 256.0) as u8
-				}).collect(),
-			meta: self.meta
-		}
+impl From<Image<Hsv, f32>> for Image<Rgb, f32> {
+	fn from(hsv: Image<Hsv, f32>) -> Image<Rgb, f32> {
+		Processor::hsv_to_rgb(hsv)
 	}
-
-	pub fn as_bytes(self) -> Vec<u8> {
-		self.rgb.into_iter().map(|x| -> u8 {
-			(x * 256.0) as u8
-		}).collect()
-	}
-}*/
+}
