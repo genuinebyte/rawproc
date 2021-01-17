@@ -1,10 +1,10 @@
-use crate::image::{RgbImage, RawImage};
+use crate::image::{Image, Sensor, Rgb};
 use crate::Color;
 use std::cmp::min;
 
 pub struct Processor {}
 impl Processor {
-	pub fn black_levels(rimg: &mut RawImage, red: u16, green: u16, blue: u16) {
+	pub fn black_levels(rimg: &mut Image<Sensor, u16>, red: u16, green: u16, blue: u16) {
 		let clamp = |light: u16, color: u16| {
 			if light < color {
 				0
@@ -14,7 +14,7 @@ impl Processor {
 		};
 
 		let mut i = 0;
-		for light in rimg.raw.iter_mut() {
+		for light in rimg.data.iter_mut() {
 			match rimg.meta.color_at_index(i) {
 				Color::Red => *light = clamp(*light, red),
 				Color::Green => *light = clamp(*light, green),
@@ -25,60 +25,60 @@ impl Processor {
 	}
 
 	// https://photo.stackexchange.com/a/41936
-	pub fn exposure(rimg: &mut RawImage, ev: f32) {
-		for light in rimg.raw.iter_mut() {
-			*light = ((*light as f32/ 4096.0) * 2f32.powf(ev) * 4096.0) as u16; //TODO: 4096 allow different bitness
+	pub fn exposure(rimg: &mut Image<Sensor, f32>, ev: f32) {
+		for light in rimg.data.iter_mut() {
+			*light = *light * 2f32.powf(ev);
 		}
 	}
 
-	pub fn gamma(rimg: &mut RawImage, value: f32) {
-		for light in rimg.raw.iter_mut() {
-			*light = ((*light as f32/ 4096.0).powf(1.0/value) * 4096.0) as u16; //TODO: 4096 allow different bitness
+	pub fn gamma(rimg: &mut Image<Sensor, f32>, value: f32) {
+		for light in rimg.data.iter_mut() {
+			*light = (*light).powf(1.0/value);
 		}
 	}
 
-	pub fn white_balance(rimg: &mut RawImage, red: f32, green: f32, blue: f32) {
+	pub fn white_balance(rimg: &mut Image<Sensor, f32>, red: f32, green: f32, blue: f32) {
 		let mut i = 0;
-		for light in rimg.raw.iter_mut() {
+		for light in rimg.data.iter_mut() {
 			match rimg.meta.color_at_index(i) {
-				Color::Red => *light = (((*light as f32 / 4096.0) * red) * 4096.0) as u16,
-				Color::Green => *light = (((*light as f32 / 4096.0) * green) * 4096.0) as u16,
-				Color::Blue => *light = (((*light as f32 / 4096.0) * blue) * 4096.0) as u16,
+				Color::Red => *light = *light * red,
+				Color::Green => *light = *light * green,
+				Color::Blue => *light = *light * blue,
 			}
 			i += 1;
 		}
 	}
 
 	// https://math.stackexchange.com/a/906280
-	pub fn brightness(cimg: &mut RgbImage<u8>, value: u8) {
-		for comp in cimg.rgb.iter_mut() {
+	pub fn brightness(cimg: &mut Image<Rgb, u8>, value: u8) {
+		for comp in cimg.data.iter_mut() {
 			*comp = min((*comp as u16) + value as u16, 256u16) as u8;
 		}
 	}
 
 	// https://math.stackexchange.com/a/906280
-	pub fn contrast(cimg: &mut RgbImage<u8>, value: f32) {
-		for comp in cimg.rgb.iter_mut() {
+	pub fn contrast(cimg: &mut Image<Rgb, u8>, value: f32) {
+		for comp in cimg.data.iter_mut() {
 			let adjusted = 0f32.max(value * (*comp as f32 - 128.0) + 128.0);
 			*comp = min(adjusted as u16, 256u16) as u8;
 		}
 	}
 
 	#[allow(non_snake_case)]
-	pub fn to_sRGB(cimg: &mut RgbImage<f32>) {
+	pub fn to_sRGB(cimg: &mut Image<Rgb, f32>) {
 		let mat = cimg.meta.colordata.rgb_cam;
-		for pix in cimg.pixel_range() {
-			let (r, g, b) = (cimg.rgb[pix], cimg.rgb[pix+1], cimg.rgb[pix+2]);
+		for pix in cimg.pixel_index_range() {
+			let (r, g, b) = (cimg.data[pix], cimg.data[pix+1], cimg.data[pix+2]);
 
-			cimg.rgb[pix] = mat[0][0] * r + mat[0][1] * g + mat[0][2] * b;   // X
-			cimg.rgb[pix+1] = mat[1][0] * r + mat[1][1] * g + mat[1][2] * b; // Y
-			cimg.rgb[pix+2] = mat[2][0] * r + mat[2][1] * g + mat[2][2] * b; // Z
+			cimg.data[pix] = mat[0][0] * r + mat[0][1] * g + mat[0][2] * b;   // X
+			cimg.data[pix+1] = mat[1][0] * r + mat[1][1] * g + mat[1][2] * b; // Y
+			cimg.data[pix+2] = mat[2][0] * r + mat[2][1] * g + mat[2][2] * b; // Z
 		}
 	}
 
 	#[allow(non_snake_case)]
-	pub fn sRGB_gamma(cimg: &mut RgbImage<f32>) {
-		for component in cimg.rgb.iter_mut() {
+	pub fn sRGB_gamma(cimg: &mut Image<Rgb, f32>) {
+		for component in cimg.data.iter_mut() {
 			// Value taken from Wikipedia page on sRGB
 			// https://en.wikipedia.org/wiki/SRGB
 			if *component <= 0.0031308 {

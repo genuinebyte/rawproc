@@ -3,11 +3,13 @@ use std::ops::Range;
 use std::iter::StepBy;
 use crate::CFA;
 use libraw::Colordata;
+use num_traits::{Num, PrimInt, AsPrimitive};
 
 pub struct Metadata {
 	pub width: u32,
 	pub height: u32,
 	pub cfa: CFA,
+	pub bit_depth: u8,
 	pub colordata: Colordata
 }
 
@@ -17,6 +19,7 @@ impl Metadata {
 			width,
 			height,
 			cfa,
+			bit_depth: 12, //TODO: Allow changing bit depth
 			colordata
 		}
 	}
@@ -44,40 +47,88 @@ impl Metadata {
 	pub fn color_at_xy(&self,x: u32, y: u32) -> Color {
 		self.cfa.color_at(x, y)
 	}
+
+	pub fn depth_max(&self) -> usize {
+		2.pow(self.bit_depth as u32) - 1
+	}
 }
 
-pub struct RawImage {
-	pub raw: Vec<u16>,
-	pub meta: Metadata
+pub trait Kind{
+	fn per_pixel() -> usize;
 }
 
-impl RawImage {
+pub struct Sensor{}
+impl Kind for Sensor {
+	fn per_pixel() -> usize {
+		1
+	}
 }
 
-pub struct RgbImage<T: Copy> {
-	pub rgb: Vec<T>,
-	pub meta: Metadata
+pub struct Rgb{}
+impl Kind for Rgb{
+	fn per_pixel() -> usize {
+		3
+	}
 }
 
-impl<T: Copy> RgbImage<T> {
-	pub fn pixel_range(&self) -> StepBy<Range<usize>> {
-		self.component_range().step_by(3)
+pub trait Component: Num + Copy {}
+impl<T: Num + Copy> Component for T {}
+
+pub struct Image<K: Kind, T: Component> {
+	pub kind: K,
+	pub data: Vec<T>,
+	pub meta: Metadata,
+}
+
+impl<K: Kind, T: Component> Image<K, T> {
+	pub fn pixel_range(&self) -> Range<usize> {
+		0..(self.meta.width as usize * self.meta.height as usize)
+	}
+
+	pub fn pixel_index_range(&self) -> StepBy<Range<usize>> {
+		self.component_range().step_by(K::per_pixel())
 	}
 
 	pub fn component_range(&self) -> Range<usize> {
-		0..(self.meta.width as usize * self.meta.height as usize * 3 as usize)
+		0..self.data.len()
 	}
 
-	pub fn component(&self, x: u32, y: u32, color: Color) -> T {
-		self.rgb[self.meta.xytoi(x, y) * 3 + color as usize]
+	pub fn component<C: Into<usize>>(&self, x: u32, y: u32, component: C) -> T {
+		self.data[self.meta.xytoi(x, y) * K::per_pixel() + component.into()]
 	}
 
-	pub fn set_component(&mut self, i: usize, color: Color, data: T) {
-		self.rgb[i * 3 + color as usize] = data;
+	pub fn set_component<C: Into<usize>>(&mut self, i: usize, component: C, value: T) {
+		self.data[i * K::per_pixel() + component.into()] = value;
 	}
 }
 
-impl RgbImage<u16> {
+impl<K: Kind, I: Component + PrimInt + AsPrimitive<f32>> Image<K, I> {
+	pub fn to_floats(self) -> Image<K, f32> {
+		let max = self.meta.depth_max() as f32;
+
+		Image {
+			kind: self.kind,
+			data: self.data.into_iter().map(|x| -> f32 {
+					x.as_() / max
+				}).collect(),
+			meta: self.meta
+		}
+	}
+}
+
+impl<K: Kind> Image<K, f32> {
+	pub fn to_bytes(self) -> Image<K, u8> {
+		Image {
+			kind: self.kind,
+			data: self.data.into_iter().map(|x| -> u8 {
+					(x * 255.0) as u8
+				}).collect(),
+			meta: self.meta
+		}
+	}
+}
+
+/*impl RgbImage<u16> {
 	pub fn as_float_image(self) -> RgbImage<f32> {
 		RgbImage {
 			rgb: self.rgb.into_iter().map(|x| -> f32 {
@@ -103,4 +154,4 @@ impl RgbImage<f32> {
 			(x * 256.0) as u8
 		}).collect()
 	}
-}
+}*/

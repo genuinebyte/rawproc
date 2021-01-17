@@ -1,29 +1,30 @@
-use crate::image::{RgbImage, RawImage};
+use crate::image::{Image, Rgb, Sensor};
 use crate::Color;
 use rand;
+use num_traits::Num;
 
 pub struct Debayer {}
 impl Debayer {
-	pub fn rgb(rimg: RawImage) -> RgbImage<u16> {
+	pub fn rgb<T: Num + Copy>(rimg: Image<Sensor, T>) -> Image<Rgb, T> {
 		let capacity = rimg.meta.pixels() * 3;
-		let mut rgb = vec![0; capacity];
+		let mut rgb = vec![T::zero(); capacity];
 
 		let mut i: usize = 0;
-		for light in rimg.raw {
+		for light in rimg.data {
 			match rimg.meta.color_at_index(i) {
 				Color::Red => {
 					rgb[i*3] = light;
-					rgb[i*3 + 1] = 0;
-					rgb[i*3 + 2] = 0;
+					rgb[i*3 + 1] = T::zero();
+					rgb[i*3 + 2] = T::zero();
 				},
 				Color::Green => {
-					rgb[i*3] = 0;
+					rgb[i*3] = T::zero();
 					rgb[i*3 + 1] = light;
-					rgb[i*3 + 2] = 0;
+					rgb[i*3 + 2] = T::zero();
 				},
 				Color::Blue => {
-					rgb[i*3] = 0;
-					rgb[i*3 + 1] = 0;
+					rgb[i*3] = T::zero();
+					rgb[i*3 + 1] = T::zero();
 					rgb[i*3 + 2] = light;
 				}
 			}
@@ -31,24 +32,24 @@ impl Debayer {
 			i += 1;
 		}
 
-		RgbImage {
-			meta: rimg.meta,
-			rgb
+		Image {
+			kind: Rgb {},
+			data: rgb,
+			meta: rimg.meta
 		}
 	}
 }
 
-pub trait Interpolate<T: Copy> {
-	fn interpolate(cimg: &mut RgbImage<T>);
+pub trait Interpolate<T: Num + Copy> {
+	fn interpolate(cimg: &mut Image<Rgb, T>);
 }
 
 // Currently assumes RGGB bayering
 pub struct NearestNeighbor {}
 
-impl<T: Copy> Interpolate<T> for NearestNeighbor {
-	fn interpolate(cimg: &mut RgbImage<T>) {
-		let pixel_count = (cimg.meta.width * cimg.meta.height) as usize;
-		for pix in 0..pixel_count {
+impl<T: Num + Copy> Interpolate<T> for NearestNeighbor {
+	fn interpolate(cimg: &mut Image<Rgb, T>) {
+		for pix in cimg.pixel_range() {
 			match cimg.meta.color_at_index(pix) {
 				Color::Red => {
 					cimg.set_component(pix, Color::Green, Self::get_component(cimg, Color::Green, pix));
@@ -68,7 +69,7 @@ impl<T: Copy> Interpolate<T> for NearestNeighbor {
 }
 
 impl NearestNeighbor {
-	fn get_component<T: Copy>(cimg: &RgbImage<T>, color: Color, i: usize) -> T {
+	fn get_component<T: Num + Copy>(cimg: &Image<Rgb, T>, color: Color, i: usize) -> T {
 		let (x, y) = cimg.meta.itoxy(i);
 
 		let top_color = if y == 0 {
