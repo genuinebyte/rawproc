@@ -135,31 +135,7 @@ impl Processor {
 	// https://en.wikipedia.org/wiki/HSL_and_HSV#HSV_to_RGB
 	pub fn hsv_to_rgb(mut hsv: Image<Hsv, f32>) -> Image<Rgb, f32> {
 		for pix in hsv.pixel_index_range() {
-			let (hue, saturation, value) = (hsv.data[pix], hsv.data[pix+1], hsv.data[pix+2]);
-
-			let chroma = value * saturation;
-			let hue_prime = hue / 60.0;
-			let x = chroma * (1.0 - (hue_prime%2.0 - 1.0).abs());
-
-			let m = value - chroma;
-			let cm = chroma + m;
-			let xm = x + m;
-
-			let (r, g, b) = if 0.0 <= hue_prime && hue_prime <= 1.0 {
-				(cm, xm, m)
-			} else if 1.0 < hue_prime && hue_prime <= 2.0 {
-				(xm, cm, m)
-			} else if 2.0 < hue_prime && hue_prime <= 3.0 {
-				(m, cm, xm)
-			} else if 3.0 < hue_prime && hue_prime <= 4.0 {
-				(m, xm, cm)
-			} else if 4.0 < hue_prime && hue_prime <= 5.0 {
-				(xm, m, cm)
-			} else if 5.0 < hue_prime && hue_prime <= 6.0 {
-				(cm, m, xm)
-			} else {
-				unreachable!()
-			};
+			let (r, g, b) = Processor::pixel_hsv_to_rgb(hsv.data[pix], hsv.data[pix+1], hsv.data[pix+2]);
 
 			hsv.data[pix] = r;
 			hsv.data[pix+1] = g;
