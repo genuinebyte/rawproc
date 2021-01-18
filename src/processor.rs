@@ -1,9 +1,16 @@
-use crate::image::{Image, Sensor, Rgb, Hsv};
-use crate::Color;
+use crate::image::{Attribute ,Color, Image, Sensor, Rgb, Hsv};
 use std::cmp::min;
 
 pub struct Processor {}
 impl Processor {
+	fn f32clamp(value: f32, min: f32, max: f32) -> f32 {
+		max.min(min.max(value))
+	}
+
+	fn normalclamp(value: f32) -> f32{
+		Self::f32clamp(value, 0.0, 1.0)
+	}
+
 	pub fn black_levels(rimg: &mut Image<Sensor, u16>, red: u16, green: u16, blue: u16) {
 		let clamp = |light: u16, color: u16| {
 			if light < color {
@@ -64,15 +71,22 @@ impl Processor {
 		}
 	}
 
+	pub fn saturation(img: &mut Image<Hsv, f32>, scalar: f32) {
+		for saturation in img.component_iter_mut(Attribute::Saturation) {
+			// Clamp to the range [0, 1]
+			*saturation =  Self::normalclamp(*saturation * scalar);
+		}
+	}
+
 	#[allow(non_snake_case)]
 	pub fn to_sRGB(cimg: &mut Image<Rgb, f32>) {
 		let mat = cimg.meta.colordata.rgb_cam;
 		for pix in cimg.pixel_index_range() {
 			let (r, g, b) = (cimg.data[pix], cimg.data[pix+1], cimg.data[pix+2]);
 
-			cimg.data[pix] = mat[0][0] * r + mat[0][1] * g + mat[0][2] * b;   // X
-			cimg.data[pix+1] = mat[1][0] * r + mat[1][1] * g + mat[1][2] * b; // Y
-			cimg.data[pix+2] = mat[2][0] * r + mat[2][1] * g + mat[2][2] * b; // Z
+			cimg.data[pix] = Self::normalclamp(mat[0][0] * r + mat[0][1] * g + mat[0][2] * b);   // X
+			cimg.data[pix+1] = Self::normalclamp(mat[1][0] * r + mat[1][1] * g + mat[1][2] * b); // Y
+			cimg.data[pix+2] = Self::normalclamp(mat[2][0] * r + mat[2][1] * g + mat[2][2] * b); // Z
 		}
 	}
 
@@ -82,9 +96,9 @@ impl Processor {
 			// Value taken from Wikipedia page on sRGB
 			// https://en.wikipedia.org/wiki/SRGB
 			if *component <= 0.0031308 {
-				*component *= 12.92;
+				*component = Self::f32clamp(*component * 12.92, 0.0, 1.0);
 			} else {
-				*component = 1.055 * component.powf(1.0/2.4) - 0.055;
+				*component = Self::f32clamp(1.055 * component.powf(1.0/2.4) - 0.055, 0.0, 1.0);
 			}
 		}
 	}
@@ -123,13 +137,21 @@ impl Processor {
 			unreachable!()
 		};
 
+		/*if hue < 0.0 {
+			panic!("Hue negative: {}\nRGB ({},{},{})\nValue `{}`, Chroma `{}`", hue, r, g, b, value, chroma)
+		}*/
+
 		let value_saturation = if value == 0.0 {				
 			0.0
 		} else {
 			chroma / value
 		};
 
-		(hue, value_saturation, value)
+		/* Rotate the color wheel counter clockwise to the negative location
+               |       Keep the wheel in place and remove any full rotations
+		  _____V____ _____V____ 
+		 |          |          |*/
+		( (hue + 360.0) % 360.0, value_saturation, value)
 	}
 
 	// https://en.wikipedia.org/wiki/HSL_and_HSV#HSV_to_RGB
@@ -171,7 +193,8 @@ impl Processor {
 		} else if 5.0 < hue_prime && hue_prime <= 6.0 {
 			(cm, m, xm)
 		} else {
-			unreachable!()
+			panic!("This shouldn't be able to happen! HSV ({},{},{})",
+			hue, saturation, value);
 		}
 	}
 }
@@ -180,8 +203,9 @@ impl Processor {
 mod cfa_tets {
 	use super::*;
 
+	// Simple colors. Maxed Red, Green, and Blue
 	#[test]
-	fn rgb_to_hsv() {
+	fn rgb_to_hsv_simple() {
 		// White. No saturation (no "colorfullness") and all value (all light emmitted, kind of)
 		let (_h, s, v) = Processor::pixel_rgb_to_hsv(1.0, 1.0, 1.0);
 		assert_eq!((s, v), (0.0, 1.0));
@@ -205,8 +229,49 @@ mod cfa_tets {
 		);
 	}
 
+	// More complex colors (not just 0 and 1)
 	#[test]
-	fn hsv_to_rgb() {
+	fn rgb_to_hsv() {
+		fn assert_close(a: (f32, f32, f32), b: (f32, f32, f32)) {
+			let tolerance = 3.9e-3; // 1 step in 8bit color
+			if (a.0 - b.0).abs() > tolerance || 
+			   (a.1 - b.1).abs() > tolerance ||
+			   (a.2 - b.2).abs() > tolerance 
+			{
+				panic!(
+					"assertion failed: `(left ~ right)`\n\
+					\tLeft: `{:?}`,\n\
+					\tRight:`{:?}`\n\
+					Deviation allowed from left (tolerance is {}):\n\
+					\tMax: `{:?}`\n\
+					\tMin: `{:?}`\n\
+					Actual Deviation: `{:?}`",
+					a,
+					b,
+					tolerance,
+					(a.0 - tolerance, a.1 - tolerance, 1.2 - tolerance),
+					(a.0 + tolerance, a.1 + tolerance, 1.2 + tolerance),
+					(a.0 - b.0, a.1 - b.1, a.2 - b.2)
+				)
+			}
+		}
+
+		// Darkish cyan
+		assert_close(
+			Processor::pixel_rgb_to_hsv(0.438, 0.875, 0.875),
+			(180.0, 0.5, 0.875)
+		);
+
+		// Pinkish black
+		assert_close(
+			Processor::pixel_rgb_to_hsv(0.25, 0.125, 0.125),
+			(0.0, 0.5, 0.25)
+		);
+	}
+
+	// Simple colors. Maxed Red, Green, and Blue
+	#[test]
+	fn hsv_to_rgb_simple() {
 		// White. Every color maxed
 		assert_eq!(
 			Processor::pixel_hsv_to_rgb(0.0, 0.0, 1.0),

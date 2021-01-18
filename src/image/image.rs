@@ -1,10 +1,12 @@
-use crate::Color;
+use crate::image::Color;
 use std::ops::Range;
 use std::iter::StepBy;
 use crate::CFA;
 use libraw::Colordata;
 use num_traits::{Num, PrimInt, AsPrimitive};
 use crate::Processor;
+use std::iter::Skip;
+use std::slice::IterMut;
 
 pub struct Metadata {
 	pub width: u32,
@@ -94,19 +96,29 @@ impl<K: Kind, T: Component> Image<K, T> {
 	}
 
 	pub fn pixel_index_range(&self) -> StepBy<Range<usize>> {
-		self.component_range().step_by(K::per_pixel())
+		self.data_range().step_by(K::per_pixel())
 	}
 
-	pub fn component_range(&self) -> Range<usize> {
+	pub fn component_range<C: Into<usize>>(&self, component: C) -> StepBy<Range<usize>> {
+		(component.into()..self.data.len()).step_by(K::per_pixel())
+	}
+
+	pub fn component_iter_mut<C: Into<usize>>(&mut self, component: C) -> StepBy<Skip<IterMut<'_, T>>> {
+		self.data.iter_mut().skip(component.into()).step_by(K::per_pixel())
+	}
+
+	pub fn data_range(&self) -> Range<usize> {
 		0..self.data.len()
 	}
+}
 
-	pub fn component<C: Into<usize>>(&self, x: u32, y: u32, component: C) -> T {
-		self.data[self.meta.xytoi(x, y) * K::per_pixel() + component.into()]
+impl<T: Component> Image<Rgb, T> {
+	pub fn component(&self, x: u32, y: u32, color: Color) -> T {
+		self.data[self.meta.xytoi(x, y) * Rgb::per_pixel() + color as usize]
 	}
 
-	pub fn set_component<C: Into<usize>>(&mut self, i: usize, component: C, value: T) {
-		self.data[i * K::per_pixel() + component.into()] = value;
+	pub fn set_component<C: Into<usize>>(&mut self, i: usize, color: C, value: T) {
+		self.data[i * Rgb::per_pixel() + color.into()] = value;
 	}
 }
 

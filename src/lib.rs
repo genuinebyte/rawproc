@@ -1,9 +1,7 @@
-mod color;
 mod processor;
 pub mod debayer;
 pub mod image;
 
-pub use color::Color;
 pub use processor::Processor;
 
 use crate::image::{CFA, Metadata, Image, Sensor};

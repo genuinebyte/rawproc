@@ -1,5 +1,4 @@
-use crate::image::{Image, Rgb, Sensor};
-use crate::Color;
+use crate::image::{Color, Image, Rgb, Sensor};
 use rand;
 use num_traits::Num;
 

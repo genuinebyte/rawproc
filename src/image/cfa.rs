@@ -1,4 +1,4 @@
-use crate::Color;
+use crate::image::Color;
 
 pub enum CFA {
 	/*
