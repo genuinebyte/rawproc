@@ -34,13 +34,13 @@ impl Processor {
 	// https://photo.stackexchange.com/a/41936
 	pub fn exposure(rimg: &mut Image<Sensor, f32>, ev: f32) {
 		for light in rimg.data.iter_mut() {
-			*light = *light * 2f32.powf(ev);
+			*light = Self::normalclamp(*light * 2f32.powf(ev));
 		}
 	}
 
 	pub fn gamma(rimg: &mut Image<Sensor, f32>, value: f32) {
 		for light in rimg.data.iter_mut() {
-			*light = (*light).powf(1.0/value);
+			*light = Self::normalclamp((*light).powf(1.0/value));
 		}
 	}
 
@@ -48,9 +48,9 @@ impl Processor {
 		let mut i = 0;
 		for light in rimg.data.iter_mut() {
 			match rimg.meta.color_at_index(i) {
-				Color::Red => *light = *light * red,
-				Color::Green => *light = *light * green,
-				Color::Blue => *light = *light * blue,
+				Color::Red => *light = Self::normalclamp(*light * red),
+				Color::Green => *light = Self::normalclamp(*light * green),
+				Color::Blue => *light = Self::normalclamp(*light * blue),
 			}
 			i += 1;
 		}
@@ -66,14 +66,12 @@ impl Processor {
 	// https://math.stackexchange.com/a/906280
 	pub fn contrast(cimg: &mut Image<Rgb, u8>, value: f32) {
 		for comp in cimg.data.iter_mut() {
-			let adjusted = 0f32.max(value * (*comp as f32 - 128.0) + 128.0);
-			*comp = min(adjusted as u16, 256u16) as u8;
+			*comp = 0f32.max(255f32.min(value * (*comp as f32 - 128.0) + 128.0)) as u8;
 		}
 	}
 
 	pub fn saturation(img: &mut Image<Hsv, f32>, scalar: f32) {
 		for saturation in img.component_iter_mut(Attribute::Saturation) {
-			// Clamp to the range [0, 1]
 			*saturation =  Self::normalclamp(*saturation * scalar);
 		}
 	}
