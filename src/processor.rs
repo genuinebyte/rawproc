@@ -58,7 +58,7 @@ impl Processor {
 
 	// https://math.stackexchange.com/a/906280
 	pub fn brightness(cimg: &mut Image<Hsv, f32>, value: f32) {
-		for comp in cimg.data.iter_mut() {
+		for comp in cimg.component_iter_mut(Attribute::Value) {
 			*comp = Self::normalclamp(*comp + value);
 		}
 	}
