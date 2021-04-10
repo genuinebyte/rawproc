@@ -56,28 +56,35 @@ impl Metadata {
 	}
 }
 
-pub trait Kind{
+pub trait Kind {
 	fn per_pixel() -> usize;
 }
 
-pub struct Sensor{}
+pub struct Sensor;
 impl Kind for Sensor {
 	fn per_pixel() -> usize {
 		1
 	}
 }
 
-pub struct Rgb{}
+pub struct Rgb;
 impl Kind for Rgb {
 	fn per_pixel() -> usize {
 		3
 	}
 }
 
-pub struct Hsv{}
+pub struct Hsv;
 impl Kind for Hsv {
 	fn per_pixel() -> usize {
 		3
+	}
+}
+
+pub struct Gray;
+impl Kind for Gray {
+	fn per_pixel() -> usize {
+		1
 	}
 }
 
@@ -157,5 +164,15 @@ impl From<Image<Rgb, f32>> for Image<Hsv, f32> {
 impl From<Image<Hsv, f32>> for Image<Rgb, f32> {
 	fn from(hsv: Image<Hsv, f32>) -> Image<Rgb, f32> {
 		Processor::hsv_to_rgb(hsv)
+	}
+}
+
+impl<T: Component> From<Image<Hsv, T>> for Image<Gray, T> {
+	fn from(hsv: Image<Hsv, T>) -> Image<Gray, T> {
+		Image {
+			kind: Gray,
+			data: hsv.data.into_iter().skip(2).step_by(3).collect(),
+			meta: hsv.meta
+		}
 	}
 }
