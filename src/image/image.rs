@@ -121,6 +121,10 @@ impl<K: Kind, T: Component> Image<K, T> {
 
 impl<T: Component> Image<Rgb, T> {
 	pub fn component(&self, x: u32, y: u32, color: Color) -> T {
+		if self.meta.xytoi(x, y) * Rgb::per_pixel() + color as usize >= self.data.len() {
+			println!("{},{} - {}", x, y, color);
+		}
+
 		self.data[self.meta.xytoi(x, y) * Rgb::per_pixel() + color as usize]
 	}
 

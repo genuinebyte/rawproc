@@ -42,7 +42,8 @@ impl Debayer {
 	pub fn interpolate(mut self, interpolation: Interpolation) -> Image<Rgb, f32> {
 		match interpolation {
 			Interpolation::None => (),
-			Interpolation::NearestNeighbor => NearestNeighbor::interpolate(&mut self.img)
+			Interpolation::NearestNeighbor => NearestNeighbor::interpolate(&mut self.img),
+			Interpolation::Bilinear => Bilinear::interpolate(&mut self.img)
 		}
 
 		self.img
@@ -51,10 +52,11 @@ impl Debayer {
 
 pub enum Interpolation {
 	None,
-	NearestNeighbor
+	NearestNeighbor,
+	Bilinear
 }
 
-// Currently assumes RGGB bayering
+// FIXME: Currently assumes RGGB bayering
 struct NearestNeighbor;
 impl NearestNeighbor {
 	fn interpolate(cimg: &mut Image<Rgb, f32>) {
@@ -166,5 +168,420 @@ impl NearestNeighbor {
 				}
 			}
 		}
+	}
+}
+
+// FIXME: Currently assumes RGGB bayering
+struct Bilinear;
+impl Bilinear {
+	fn interpolate(img: &mut Image<Rgb, f32>) {
+		for pix in img.pixel_range() {
+			match img.meta.color_at_index(pix) {
+				Color::Red => {
+					let (green, blue) = Self::average_for_red(&img, pix);
+					img.set_component(pix, Color::Green, green);
+					img.set_component(pix, Color::Blue, blue);
+				}
+				Color::Green => {
+					if img.meta.itoxy(pix).1 % 2 == 1 {
+						let (red, blue) = Self::average_for_yeven_green(&img, pix);
+						img.set_component(pix, Color::Red, red);
+						img.set_component(pix, Color::Blue, blue);
+					} else {
+						let (blue, red) = Self::average_for_yodd_green(&img, pix);
+						img.set_component(pix, Color::Red, red);
+						img.set_component(pix, Color::Blue, blue);
+					}
+				},
+				Color::Blue => {
+					let (red, green) = Self::average_for_blue(&img, pix);
+					img.set_component(pix, Color::Red, red);
+					img.set_component(pix, Color::Green, green);
+				}
+			}
+		}
+	}
+
+	// Returns green, blue
+	fn average_for_red(img: &Image<Rgb, f32>, i: usize) -> (f32, f32) {
+		let (x, y) = img.meta.itoxy(i);
+		let (top, right, bottom, left) = Self::edges(img.meta.width, img.meta.height, x, y);
+
+		if top {
+			if left {
+				(
+					(
+						img.component(x+1, y, Color::Green) + //Right
+						img.component(x, y+1, Color::Green)   //Bottom
+					) / 2.0,
+					img.component(x+1, y+1, Color::Blue) //Bottom-right
+				)
+			} else if right {
+				(
+					(
+						img.component(x-1, y, Color::Green) + //Left
+						img.component(x, y+1, Color::Green)   //Bottom
+					) / 2.0,
+					img.component(x-1, y+1, Color::Blue) //Bottom-left
+				)
+			} else {
+				(
+					(
+						img.component(x+1, y, Color::Green) + //Right
+						img.component(x, y+1, Color::Green) + //Bottom
+						img.component(x-1, y, Color::Green)   //Left
+					) / 3.0,
+					(
+						img.component(x+1, y+1, Color::Blue) + //Bottom-right
+						img.component(x-1, y+1, Color::Blue)   //Bottom-left
+					) / 2.0
+				)
+			}
+		} else if bottom {
+			if left {
+				(
+					(
+						img.component(x, y-1, Color::Green) + //Top
+						img.component(x+1, y, Color::Green)   //Right
+					) / 2.0,
+					img.component(x+1, y-1, Color::Blue) //Top-right
+				)
+			} else if right {
+				(
+					(
+						img.component(x, y-1, Color::Green) + //Top
+						img.component(x-1, y, Color::Green)   //Left
+					) / 2.0,
+					img.component(x-1, y-1, Color::Blue) //Top-left
+				)
+			} else {
+				(
+					(
+						img.component(x, y-1, Color::Green) + //Top
+						img.component(x+1, y, Color::Green) + //Right
+						img.component(x-1, y, Color::Green)   //Left
+					) / 3.0,
+					(
+						img.component(x+1, y-1, Color::Blue) + //Top-right
+						img.component(x-1, y-1, Color::Blue)   //Top-left
+					) / 2.0
+				)
+			}
+		} else {
+			if right {
+			(
+				(
+					img.component(x, y-1, Color::Green) + //Top
+					img.component(x, y+1, Color::Green) + //Bottom
+					img.component(x-1, y, Color::Green)   //Left
+				) / 3.0,
+				(
+					img.component(x-1, y+1, Color::Blue) + //Bottom-left
+					img.component(x-1, y-1, Color::Blue)   //Top-left
+				) / 2.0
+			)
+			} else if left {
+				(
+					(
+						img.component(x, y-1, Color::Green) + //Top
+						img.component(x+1, y, Color::Green) + //Right
+						img.component(x, y+1, Color::Green)   //Bottom
+					) / 3.0,
+					(
+						img.component(x+1, y-1, Color::Blue) + //Top-right
+						img.component(x+1, y+1, Color::Blue)   //Bottom-right
+					) / 2.0
+				)
+			} else {
+				(
+					(
+						img.component(x, y-1, Color::Green) + //Top
+						img.component(x+1, y, Color::Green) + //Right
+						img.component(x, y+1, Color::Green) + //Bottom
+						img.component(x-1, y, Color::Green)   //Left
+					) / 4.0,
+					(
+						img.component(x+1, y-1, Color::Blue) + //Top-right
+						img.component(x+1, y+1, Color::Blue) + //Bottom-right
+						img.component(x-1, y+1, Color::Blue) + //Bottom-left
+						img.component(x-1, y-1, Color::Blue)   //Top-left
+					) / 4.0
+				)
+			}
+		}
+	}
+
+	// Returns red, blue
+	fn average_for_yeven_green(img: &Image<Rgb, f32>, i: usize) -> (f32, f32) {
+		let (x, y) = img.meta.itoxy(i);
+		let (top, right, bottom, left) = Self::edges(img.meta.width, img.meta.height, x, y);
+
+		if top {
+			if left {
+				(
+					img.component(x, y+1, Color::Red), //Bottom
+					img.component(x+1, y, Color::Blue) //Right
+				)
+			} else if right {
+				(
+					img.component(x, y+1, Color::Red), //Bottom
+					img.component(x-1, y, Color::Blue) //Left
+				)
+			} else {
+				(
+					img.component(x, y+1, Color::Red), //Bottom
+					(
+						img.component(x-1, y, Color::Blue) + //Left
+						img.component(x+1, y, Color::Blue)   //Right
+					) / 2.0
+				)
+			}
+		} else if bottom {
+			if left {
+				(
+					img.component(x, y-1, Color::Red), //Top
+					img.component(x+1, y, Color::Blue) //Right
+				)
+			} else if right {
+				(
+					img.component(x, y-1, Color::Red), //Top
+					img.component(x-1, y, Color::Blue) //Left
+				)
+			} else {
+				(
+					img.component(x, y-1, Color::Red), //Top
+					(
+						img.component(x-1, y, Color::Blue) + //Left
+						img.component(x+1, y, Color::Blue)   //Right
+					) / 2.0
+				)
+			}
+		} else {
+			if right {
+				(
+					(
+						img.component(x, y-1, Color::Red) + //Top
+						img.component(x, y+1, Color::Red)   //Bottom
+					) / 2.0,
+					img.component(x-1, y, Color::Blue) //Left
+				)
+			} else if left {
+				(
+					(
+						img.component(x, y-1, Color::Red) + //Top
+						img.component(x, y+1, Color::Red)   //Bottom
+					) / 2.0,
+					img.component(x+1, y, Color::Blue) //Right
+				)
+			} else {
+				(
+					(
+						img.component(x, y-1, Color::Red) + //Top
+						img.component(x, y+1, Color::Red)   //Bottom
+					) / 2.0,
+					(
+						img.component(x-1, y, Color::Blue) + //Left
+						img.component(x+1, y, Color::Blue)   //Right
+					) / 2.0
+				)
+			}
+		}
+	}
+
+	// Returns red, blue
+	fn average_for_yodd_green(img: &Image<Rgb, f32>, i: usize) -> (f32, f32) {
+		let (x, y) = img.meta.itoxy(i);
+		let (top, right, bottom, left) = Self::edges(img.meta.width, img.meta.height, x, y);
+
+		if top {
+			if left {
+				(
+					img.component(x, y+1, Color::Blue), //Bottom
+					img.component(x+1, y, Color::Red) //Right
+				)
+			} else if right {
+				(
+					img.component(x, y+1, Color::Blue), //Bottom
+					img.component(x-1, y, Color::Red) //Left
+				)
+			} else {
+				(
+					img.component(x, y+1, Color::Blue), //Bottom
+					(
+						img.component(x-1, y, Color::Red) + //Left
+						img.component(x+1, y, Color::Red)   //Right
+					) / 2.0
+				)
+			}
+		} else if bottom {
+			if left {
+				(
+					img.component(x, y-1, Color::Blue), //Top
+					img.component(x+1, y, Color::Red) //Right
+				)
+			} else if right {
+				(
+					img.component(x, y-1, Color::Blue), //Top
+					img.component(x-1, y, Color::Red) //Left
+				)
+			} else {
+				(
+					img.component(x, y-1, Color::Blue), //Top
+					(
+						img.component(x-1, y, Color::Red) + //Left
+						img.component(x+1, y, Color::Red)   //Right
+					) / 2.0
+				)
+			}
+		} else {
+			if right {
+				(
+					(
+						img.component(x, y-1, Color::Blue) + //Top
+						img.component(x, y+1, Color::Blue)   //Bottom
+					) / 2.0,
+					img.component(x-1, y, Color::Red) //Left
+				)
+			} else if left {
+				(
+					(
+						img.component(x, y-1, Color::Blue) + //Top
+						img.component(x, y+1, Color::Blue)   //Bottom
+					) / 2.0,
+					img.component(x+1, y, Color::Red) //Right
+				)
+			} else {
+				(
+					(
+						img.component(x, y-1, Color::Blue) + //Top
+						img.component(x, y+1, Color::Blue)   //Bottom
+					) / 2.0,
+					(
+						img.component(x-1, y, Color::Red) + //Left
+						img.component(x+1, y, Color::Red)   //Right
+					) / 2.0
+				)
+			}
+		}
+	}
+
+	// Returns red, green
+	fn average_for_blue(img: &Image<Rgb, f32>, i: usize) -> (f32, f32) {
+		let (x, y) = img.meta.itoxy(i);
+		let (top, right, bottom, left) = Self::edges(img.meta.width, img.meta.height, x, y);
+
+		if top {
+			if left {
+				(
+					img.component(x+1, y+1, Color::Red), //Bottom-right
+					(
+						img.component(x+1, y, Color::Green) + //Right
+						img.component(x, y+1, Color::Green)   //Bottom
+					) / 2.0
+				)
+			} else if right {
+				(
+					img.component(x-1, y+1, Color::Red), //Bottom-left
+					(
+						img.component(x-1, y, Color::Green) + //Left
+						img.component(x, y+1, Color::Green)   //Bottom
+					) / 2.0
+				)
+			} else {
+				(
+					(
+						img.component(x+1, y+1, Color::Red) + //Bottom-right
+						img.component(x-1, y+1, Color::Red)   //Bottom-left
+					) / 2.0,
+					(
+						img.component(x+1, y, Color::Green) + //Right
+						img.component(x, y+1, Color::Green) + //Bottom
+						img.component(x-1, y, Color::Green)   //Left
+					) / 3.0
+				)
+			}
+		} else if bottom {
+			if left {
+				(
+
+					img.component(x+1, y-1, Color::Red), //Top-right
+					(
+						img.component(x, y-1, Color::Green) + //Top
+						img.component(x+1, y, Color::Green)   //Right
+					) / 2.0
+				)
+			} else if right {
+				(
+					img.component(x-1, y-1, Color::Red), //Top-left
+					(
+						img.component(x, y-1, Color::Green) + //Top
+						img.component(x-1, y, Color::Green)   //Left
+					) / 2.0
+				)
+			} else {
+				(
+					(
+						img.component(x+1, y-1, Color::Red) + //Top-right
+						img.component(x-1, y-1, Color::Red)   //Top-left
+					) / 2.0,
+					(
+						img.component(x, y-1, Color::Green) + //Top
+						img.component(x+1, y, Color::Green) + //Right
+						img.component(x-1, y, Color::Green)   //Left
+					) / 3.0
+				)
+			}
+		} else {
+			if right {
+			(
+				(
+					img.component(x-1, y+1, Color::Red) + //Bottom-left
+					img.component(x-1, y-1, Color::Red)   //Top-left
+				) / 2.0,
+				(
+					img.component(x, y-1, Color::Green) + //Top
+					img.component(x, y+1, Color::Green) + //Bottom
+					img.component(x-1, y, Color::Green)   //Left
+				) / 3.0
+			)
+			} else if left {
+				(
+					(
+						img.component(x+1, y-1, Color::Red) + //Top-right
+						img.component(x+1, y+1, Color::Red)   //Bottom-right
+					) / 2.0,
+					(
+						img.component(x, y-1, Color::Green) + //Top
+						img.component(x+1, y, Color::Green) + //Right
+						img.component(x, y+1, Color::Green)   //Bottom
+					) / 3.0
+				)
+			} else {
+				(
+					(
+						img.component(x+1, y-1, Color::Red) + //Top-right
+						img.component(x+1, y+1, Color::Red) + //Bottom-right
+						img.component(x-1, y+1, Color::Red) + //Bottom-left
+						img.component(x-1, y-1, Color::Red)   //Top-left
+					) / 4.0,
+					(
+						img.component(x, y-1, Color::Green) + //Top
+						img.component(x+1, y, Color::Green) + //Right
+						img.component(x, y+1, Color::Green) + //Bottom
+						img.component(x-1, y, Color::Green)   //Left
+					) / 4.0
+				)
+			}
+		}
+	}
+
+	fn edges(w: u32, h: u32, x: u32, y: u32) -> (bool, bool, bool, bool) {
+		// Like CSS: Top, Right, Bottom, Left
+		(
+			y < 1,
+			x >= w-1,
+			y >= h-1,
+			x < 1
+		)
 	}
 }

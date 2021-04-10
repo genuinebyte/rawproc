@@ -29,7 +29,7 @@ impl From<Attribute> for usize {
 }
 
 /// Colors as used by the Rgb kinds of images
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Color {
 	Red,
 	Green,
