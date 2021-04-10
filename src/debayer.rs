@@ -1,53 +1,63 @@
 use crate::image::{Color, Image, Rgb, Sensor};
 use rand;
-use num_traits::Num;
 
-pub struct Debayer {}
+pub struct Debayer {
+	img: Image<Rgb, f32>
+}
+
 impl Debayer {
-	pub fn rgb<T: Num + Copy>(rimg: Image<Sensor, T>) -> Image<Rgb, T> {
-		let capacity = rimg.meta.pixels() * 3;
-		let mut rgb = vec![T::zero(); capacity];
+	pub fn new(mut rimg: Image<Sensor, f32>) -> Self {
+		let sensor_len = rimg.data.len();
+		rimg.data.resize(sensor_len * 3, 0.0);
 
-		let mut i: usize = 0;
-		for light in rimg.data {
+		for i in (0..sensor_len).rev() {
 			match rimg.meta.color_at_index(i) {
 				Color::Red => {
-					rgb[i*3] = light;
-					rgb[i*3 + 1] = T::zero();
-					rgb[i*3 + 2] = T::zero();
+					rimg.data[i*3] = rimg.data[i];
+					rimg.data[i*3+1] = 0.0;
+					rimg.data[i*3+2] = 0.0;
 				},
 				Color::Green => {
-					rgb[i*3] = T::zero();
-					rgb[i*3 + 1] = light;
-					rgb[i*3 + 2] = T::zero();
+					rimg.data[i*3] = 0.0;
+					rimg.data[i*3+1] = rimg.data[i];
+					rimg.data[i*3+2] = 0.0;
 				},
 				Color::Blue => {
-					rgb[i*3] = T::zero();
-					rgb[i*3 + 1] = T::zero();
-					rgb[i*3 + 2] = light;
+					rimg.data[i*3] = 0.0;
+					rimg.data[i*3+1] = 0.0;
+					rimg.data[i*3+2] = rimg.data[i];
 				}
 			}
-
-			i += 1;
 		}
 
-		Image {
-			kind: Rgb {},
-			data: rgb,
-			meta: rimg.meta
+		Self {
+			img: Image {
+				kind: Rgb {},
+				data: rimg.data,
+				meta: rimg.meta
+			}
 		}
+	}
+
+	pub fn interpolate(mut self, interpolation: Interpolation) -> Image<Rgb, f32> {
+		match interpolation {
+			Interpolation::None => (),
+			Interpolation::NearestNeighbor => NearestNeighbor::interpolate(&mut self.img)
+		}
+
+		self.img
 	}
 }
 
-pub trait Interpolate<T: Num + Copy> {
-	fn interpolate(cimg: &mut Image<Rgb, T>);
+pub enum Interpolation {
+	None,
+	NearestNeighbor
 }
 
 // Currently assumes RGGB bayering
-pub struct NearestNeighbor {}
-
-impl<T: Num + Copy> Interpolate<T> for NearestNeighbor {
-	fn interpolate(cimg: &mut Image<Rgb, T>) {
+struct NearestNeighbor;
+impl NearestNeighbor {
+	fn interpolate(cimg: &mut Image<Rgb, f32>) {
 		for pix in cimg.pixel_range() {
 			match cimg.meta.color_at_index(pix) {
 				Color::Red => {
@@ -65,10 +75,8 @@ impl<T: Num + Copy> Interpolate<T> for NearestNeighbor {
 			}
 		}
 	}
-}
 
-impl NearestNeighbor {
-	fn get_component<T: Num + Copy>(cimg: &Image<Rgb, T>, color: Color, i: usize) -> T {
+	fn get_component(cimg: &Image<Rgb, f32>, color: Color, i: usize) -> f32 {
 		let (x, y) = cimg.meta.itoxy(i);
 
 		let top_color = if y == 0 {
