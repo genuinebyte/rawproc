@@ -10,4 +10,4 @@ The docs are kind of lacking (but will be improved!), so if you've somehow found
 and want to use this crate, the code over in the [easyraw repository][easyraw-github] is a pretty
 good example.
 
-[easyraw-github]: https://github.com/genuinebyte/easyraw
+[easyraw-github]: https://github.com/gennyble/easyraw
